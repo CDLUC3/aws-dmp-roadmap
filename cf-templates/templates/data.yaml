@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: 'Persistent resources for the DMPRoadmap system'
+
+Parameters:
+  VpcID:
+    Type: String
+  Subnet1:
+    Type: String
+  Subnet2:
+    Type: String
+
+  AppName:
+    Type: String
+  Environment:
+    Type: String
+    Default: 'dev'
+
+  ECRLifecyclePolicyTagPrefix:
+    Type: String
+    Default: 'v'
+  ECRLifecyclePolicyImagesToRetain:
+    Type: Number
+    Default: 5
+
+  DBInstanceType:
+    Type: String
+    Default: 'db.t3.small'
+  DBSizeGB:
+    Type: Number
+    Default: 20
+  DBEngine:
+    Type: String
+    Default: 'MySQL'
+  DBName:
+    Type: String
+  DBAUsername:
+    Type: String
+  DBAPassword:
+    Type: String
+
+Resources:
+  # -----------------------------------------------------------
+  # Elastic Container Repository (ECR) - Hosts the application's Docker images
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_ECR.html
+  # -----------------------------------------------------------
+  ECRRepository:
+    Type: 'AWS::ECR::Repository'
+    Properties:
+      RepositoryName: !Sub '${AppName}-${Environment}-ecr'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub >
+          {
+            "rules": [
+              {
+                "action": {
+                  "type": "expire"
+                },
+                "selection": {
+                  "countType": "imageCountMoreThan",
+                  "countNumber": ${ECRLifecyclePolicyImagesToRetain},
+                  "tagStatus": "tagged",
+                  "tagPrefixList": [
+                    "${ECRLifecyclePolicyTagPrefix}"
+                  ]
+                },
+                "description": "Only retain the last ${ECRLifecyclePolicyImagesToRetain} versions",
+                "rulePriority": 1
+              }
+            ]
+          }
+
+  # -----------------------------------------------------------
+  # S3 Bucket for the application to store logos
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_S3.html
+  # -----------------------------------------------------------
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+
+  # -----------------------------------------------------------
+  # EC2 Security Groups for use with RDS database and ECS instances
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+  # -----------------------------------------------------------
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'RDS security group for ${AppName}-${Environment}'
+      GroupName: !Sub '${AppName}-${Environment}-sec'
+      VpcId: !Ref VpcID
+
+  # An Ingress rule for this security group is defined in the application.yaml
+
+  DBSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    DependsOn:
+      - DBSecurityGroup
+    Properties:
+      CidrIp: '0.0.0.0/0'
+      IpProtocol: -1 # All protocols
+      FromPort: -1 # All ports
+      ToPort: -1 # All ports
+      GroupId: !GetAtt DBSecurityGroup.GroupId
+
+  # -----------------------------------------------------------
+  # Relational Database Service (RDS) - DB for the application
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_RDS.html
+  # -----------------------------------------------------------
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub 'Subnet group for ${AppName}-${Environment}'
+      SubnetIds:
+        - !Ref Subnet1
+        - !Ref Subnet2
+
+  Database:
+    Type: 'AWS::RDS::DBInstance'
+    DependsOn:
+      - DBSubnetGroup
+      - DBSecurityGroup
+    Properties:
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      AllowMajorVersionUpgrade: true
+      AutoMinorVersionUpgrade: true
+      BackupRetentionPeriod: 7 # days
+      CopyTagsToSnapshot: true
+      AllocatedStorage: !Ref DBSizeGB
+      Port: '3306'
+      Engine: !Ref DBEngine
+      EngineVersion: '8.0.16'
+      # MonitoringInterval: '60'
+      # MonitoringRoleArn: 'arn:aws:iam::123456789012:role/rds-monitoring-role'
+      DBName: !Ref DBName
+      DBInstanceClass: !Ref DBInstanceType
+      MasterUsername: !Ref DBAUsername
+      MasterUserPassword: !Ref DBAPassword
+
+Outputs:
+  ECRRepositoryName:
+    Value: !Ref ECRRepository
+  ECRRepositoryARN:
+    Value: !GetAtt ECRRepository.Arn
+  ECRRepositoryURI:
+    Value: !GetAtt ECRRepository.RepositoryUri
+
+  S3BucketName:
+    Value: !Ref S3Bucket
+  S3BucketARN:
+    Value: !GetAtt S3Bucket.Arn
+  S3BucketURL:
+    Value: !GetAtt S3Bucket.WebsiteURL
+
+  DBInstanceName:
+    Value: !Ref Database
+  DBAddress:
+    Value: !GetAtt Database.Endpoint.Address
+  DBPort:
+    Value: !GetAtt Database.Endpoint.Port
+  DBName:
+    Value: !Ref DBName
+
+  DBSecurityGroupID:
+    Value: !GetAtt DBSecurityGroup.GroupId

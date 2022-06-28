@@ -1,0 +1,23 @@
+template:
+  path: 'data.yaml'
+  type: 'file'
+
+parameters:
+  VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
+  Subnet1: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+  Subnet2: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+
+  Environment: !stack_attr sceptre_user_data.env
+  AppName: !stack_attr sceptre_user_data.application
+
+  ECRLifecyclePolicyTagPrefix: 'v'
+  ECRLifecyclePolicyImagesToRetain: '5'
+
+  DBInstanceType: 'db.t3.micro'
+  # Valid options are based on the DB engine.
+  #   See: at: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html#cfn-rds-dbinstance-allocatedstorage
+  DBSizeGB: '20'
+  DBName: 'roadmap'
+  DBEngine: 'MySQL'
+  DBAUsername: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_username
+  DBAPassword: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_password

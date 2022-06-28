@@ -1,0 +1,22 @@
+template:
+  path: 'application.yaml'
+  type: 'file'
+
+parameters:
+  VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
+  Subnet1: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+  Subnet2: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+  HostedZoneID: !stack_output_external sceptre-uc3-ops-common-dev-route53::HostedZoneID
+
+  Environment: !stack_attr sceptre_user_data.env
+  AppName: !stack_attr sceptre_user_data.application
+  Subdomain: !stack_attr sceptre_user_data.subdomain
+  Domain: !stack_attr sceptre_user_data.domain
+
+  ECSDesiredServiceCount: '1'
+
+  RailsEnv: !stack_attr sceptre_user_data.rails_env
+  DBSecurityGroupID: !stack_output dev/data.yaml::DBSecurityGroupID
+  DBAddress: !stack_output dev/data.yaml::DBAddress
+  DBPort: !stack_output dev/data.yaml::DBPort
+  DBName: !stack_output dev/data.yaml::DBName

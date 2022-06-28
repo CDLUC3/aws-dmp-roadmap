@@ -1,0 +1,5 @@
+# DMPRoadmap stack group config
+# --------------------------------------
+project_code: uc3-dmp-roadmap
+region: us-west-2
+template_bucket_name: uc3-dmp-roadmap-cfn
