@@ -80,6 +80,7 @@ Resources:
         # TODO: We should probably pair these back
         - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess'
         # - 'arn:aws:iam::aws:policy/AmazonECS_FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
 
   # IAM Role that the individual ECS containers will use. The containers must be able
