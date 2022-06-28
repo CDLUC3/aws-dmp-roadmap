@@ -37,10 +37,34 @@ Parameters:
     Type: String
   DBAUsername:
     Type: String
+    Defult: '{{resolve:ssm:/uc3/dmp/roadmap/dev/db_dba_username}}'
   DBAPassword:
     Type: String
+    Default: '{{resolve:ssm:/uc3/dmp/roadmap/dev/db_dba_password}}'
 
 Resources:
+  # -----------------------------------------------------------
+  # Key Management Service (KMS) - Used to enable encryption for the RDS DB
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_KMS.html
+  # -----------------------------------------------------------
+  # KMSKey:
+  #   Type: 'AWS::KMS::Key'
+  #   Properties:
+  #     KeyPolicy:
+  #       Version: '2012-10-17'
+  #       Id: !Sub '${AppName}-${Environment}-kms'
+  #       Statement:
+  #         - Sid: 'Enable IAM User Permissions'
+  #           Effect: 'Allow'
+  #           Principal:
+  #             AWS: !Join
+  #               - ''
+  #               - - 'arn:aws:iam::'
+  #                 - !Ref AWS::AccountId
+  #                 - ':root'
+  #           Action: 'kms:*'
+  #           Resource: '*'
+
   # -----------------------------------------------------------
   # Elastic Container Repository (ECR) - Hosts the application's Docker images
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_ECR.html

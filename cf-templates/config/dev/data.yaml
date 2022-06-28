@@ -19,5 +19,8 @@ parameters:
   DBSizeGB: '20'
   DBName: 'roadmap'
   DBEngine: 'MySQL'
-  DBAUsername: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_username
-  DBAPassword: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_password
+
+  # Credentials are stored in SSM parameter store and will be retrieved by default. You can
+  # override them here though if necessary (see template for SSM parameter names):
+  # DBAUsername: 'root'
+  # DBAPassword: ''

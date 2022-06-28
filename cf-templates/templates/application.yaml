@@ -26,6 +26,10 @@ Parameters:
   ECSDesiredServiceCount:
     Type: Number
     Default: 1
+  # InitialImage:
+  #   Type: String
+  ECRRepositoryName:
+    Type: String
 
   RailsEnv:
     Type: String
@@ -39,28 +43,6 @@ Parameters:
     Type: String
 
 Resources:
-  # -----------------------------------------------------------
-  # Key Management Service (KMS) - Used to enable encryption for the RDS DB
-  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_KMS.html
-  # -----------------------------------------------------------
-  # KMSKey:
-  #   Type: 'AWS::KMS::Key'
-  #   Properties:
-  #     KeyPolicy:
-  #       Version: '2012-10-17'
-  #       Id: !Sub '${AppName}-${Environment}-kms'
-  #       Statement:
-  #         - Sid: 'Enable IAM User Permissions'
-  #           Effect: 'Allow'
-  #           Principal:
-  #             AWS: !Join
-  #               - ''
-  #               - - 'arn:aws:iam::'
-  #                 - !Ref AWS::AccountId
-  #                 - ':root'
-  #           Action: 'kms:*'
-  #           Resource: '*'
-
   # -----------------------------------------------------------
   # Identitity and Access Management (IAM)
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
@@ -111,12 +93,11 @@ Resources:
           - Effect: 'Allow'
             Principal:
               Service:
-                - 'ec2.amazonaws.com'
+                - 'ecs-tasks.amazonaws.com'
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonRDSDataFullAccess'
-        # - 'arn:aws:iam::aws:policy/AmazonRDSFullAccess'
         - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
@@ -291,28 +272,30 @@ Resources:
   # Route53 - DNS configuration
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_Route53.html
   # -----------------------------------------------------------
-  Route53RecordSet:
-    Type: AWS::Route53::RecordSet
-    DependsOn:
-      - ALB
-    Properties:
-      HostedZoneId: !Ref HostedZoneID
-      Name: !Sub '${Subdomain}.${Domain}'
-      Type: A
-      TTL: 900
-      ResourceRecords:
-        - !GetAtt ALB.DNSName
+  # Route53RecordSet:
+  #   Type: AWS::Route53::RecordSet
+  #   DependsOn:
+  #     - ALB
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneID
+  #     Name: !Ref Subdomain
+  #     Type: A
+  #     # Failover: TODO: we can use this as a maintenance page I think
+  #     AliasTarget:
+  #       DNSName: !GetAtt ALB.DNSName
+  #       HostedZoneId: !Ref HostedZoneID
+  #       # EvaluateTargetHealth: true
 
-  Certificate:
-    Type: AWS::CertificateManager::Certificate
-    DependsOn:
-      - Route53RecordSet
-    Properties:
-      DomainName: !Sub '${Subdomain}.${Domain}'
-      DomainValidationOptions:
-        - DomainName: !Sub '${Subdomain}.${Domain}'
-          HostedZoneId: !Ref HostedZoneID
-      ValidationMethod: DNS
+  # Certificate:
+  #   Type: AWS::CertificateManager::Certificate
+  #   DependsOn:
+  #     - Route53RecordSet
+  #   Properties:
+  #     DomainName: !Sub '${Subdomain}.${Domain}'
+  #     DomainValidationOptions:
+  #       - DomainName: !Sub '${Subdomain}.${Domain}'
+  #         HostedZoneId: !Ref HostedZoneID
+  #     ValidationMethod: DNS
 
   # -----------------------------------------------------------
   # Elastic Container Service (ECS) - Containers that host the application
@@ -332,35 +315,6 @@ Resources:
       #   Name: 'containerInsights'
       #   Value: 'enabled'
 
-  # Container Service definition
-  ECSService:
-    Type: 'AWS::ECS::Service'
-    DependsOn:
-      - ALBListener
-    Properties:
-      Cluster:
-        Ref: ECSCluster
-      EnableECSManagedTags: true
-      HealthCheckGracePeriodSeconds: 300 # 5 minutes for app startup
-      PropogateTags: 'SERVICE'
-      Role:
-        Ref: ECSDeployRole
-      TaskDefinition:
-        Ref: ECSTaskDefinition
-      DesiredCount: !Ref ECSDesiredServiceCount
-      LoadBalancers:
-        - TargetGroupArn:
-            Ref: ALBTargetGroup
-          ContainerPort: 80
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          SecurityGroups:
-            - !GetAtt ECSSecurityGroup.GroupId
-          AssignPublicIp: 'DISABLED'
-          Subnets:
-            - !Ref Subnet1
-            - !Ref Subnet2
-
   # The Application/Task definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -379,40 +333,76 @@ Resources:
       # TODO: Return to setup logging config ... super annoying that it forces/requires JSON here
       ContainerDefinitions:
         -
-          Command: 'bundle exec puma -C config/application.rb -p 8086'
+          # Image: !Ref InitialImage
+          Image: !Join
+            - ''
+            - - !Ref AWS::AccountId
+              - '.dkr.ecr.'
+              - !Ref AWS::Region
+              - '.amazonaws.com/'
+              - !Ref ECRRepositoryName
+          Command:
+            - 'cd /usr/src/app && bin/rails db:create && bin/rails db:schema:load && bin/rails db:seed'
+            - 'bundle exec puma -C config/application.rb -p 8086'
           Cpu: 2
           DisableNetworking: false
           Essential: true
           Interactive: true
           Memory: 2000
           Name: !Ref AppName
-          ReadOnlyFilesystem: true
           StartTimeout: 180
           StopTimeout: 60
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: 'tcp'
+            - ContainerPort: 8080
+              Protocol: 'tcp'
+            - ContainerPort: 433
+              Protocol: 'tcp'
           Secrets:
             - Name: 'DATABASE_USERNAME'
-              ValueFrom: !Join
-                - ':'
-                - - 'arn:aws:ssm'
-                  - !Ref AWS::Region
-                  - !Ref AWS::AccountId
-                  - '/uc3/dmp/roadmap/dev/db_app_username'
+              ValueFrom: '/uc3/dmp/roadmap/dev/db_app_username'
             - Name: 'DATABASE_PASSWORD'
-              ValueFrom: !Join
-                - ':'
-                - - 'arn:aws:ssm'
-                  - !Ref AWS::Region
-                  - !Ref AWS::AccountId
-                  - '/uc3/dmp/roadmap/dev/db_app_password'
+              ValueFrom: '/uc3/dmp/roadmap/dev/db_app_password'
           Environment:
-            - Key: 'RAILS_ENV'
+            - Name: 'RAILS_ENV'
               Value: !Ref RailsEnv
-            - Key: 'DATABASE_HOST'
+            - Name: 'DATABASE_HOST'
               Value: !Ref DBAddress
-            - Key: 'DATABASE_PORT'
+            - Name: 'DATABASE_PORT'
               Value: !Ref DBPort
-            - Key: 'DATABASE_NAME'
+            - Name: 'DATABASE_NAME'
               Value: !Ref DBName
+
+  # Container Service definition
+  ECSService:
+    Type: 'AWS::ECS::Service'
+    DependsOn:
+      - ALBListener
+      - ECSTaskDefinition
+    Properties:
+      Cluster: !Ref ECSCluster
+      DesiredCount: !Ref ECSDesiredServiceCount
+      EnableECSManagedTags: true
+      # EnableExecuteCommand: true #TODO: investigate what this means
+      HealthCheckGracePeriodSeconds: 300 # 5 minutes for app startup
+      LaunchType: 'FARGATE'
+      LoadBalancers:
+        - TargetGroupArn: !Ref ALBTargetGroup
+          ContainerPort: 80
+          ContainerName: !Ref AppName
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !GetAtt ECSSecurityGroup.GroupId
+          AssignPublicIp: 'DISABLED'
+          Subnets:
+            - !Ref Subnet1
+            - !Ref Subnet2
+      PlatformVersion: 'LATEST'
+      PropagateTags: 'TASK_DEFINITION'
+      SchedulingStrategy: 'REPLICA'
+      TaskDefinition: !Ref ECSTaskDefinition
 
   # -----------------------------------------------------------
   # CodeBuild
@@ -425,8 +415,8 @@ Resources:
   # -----------------------------------------------------------
 
 Outputs:
-  DomainName:
-    Value: !Ref Route53RecordSet
+  # DomainName:
+  #   Value: !Ref Route53RecordSet
 
   # SSLCertArn:
   #   Value: !Ref Certificate
