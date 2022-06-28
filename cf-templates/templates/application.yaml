@@ -62,6 +62,7 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonECS_FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
 
   # Role used to build/deploy an ECS Container
   ECSTaskRole:
@@ -99,7 +100,8 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonRDSDataFullAccess'
-        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        # - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
 # arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
