@@ -26,3 +26,9 @@ Note: You can use normal git commands to checkout a different branch/tag if nece
 The DMPRoadmap system uses Fargate - Elastic Container Service (ECS) to manage the auto-scaling resources that host the DMPRoadmap application. The container instances sit behind an Application Load Balancer (ALB) which is protected by a Web Application Firewall (WAF).
 
 Build these resources by running: `sceptre create dev/application.yaml`
+
+### Verify that the application is running and accessible
+
+- Login to the AWS console and go to CloudFormation.
+- Click on the `uc3-dmp-roadmap-dev-application` stack and go to the 'Outputs' tab
+- Visit the URL defined in the 'DomainName' attribute

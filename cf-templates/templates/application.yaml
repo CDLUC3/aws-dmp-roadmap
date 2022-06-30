@@ -4,42 +4,55 @@ Transform: AWS::Serverless-2016-10-31
 Description: 'Serverless architecture for the DMPRoadmap system'
 
 Parameters:
-  VpcID:
-    Type: String
-  Subnet1:
-    Type: String
-  Subnet2:
-    Type: String
-  HostedZoneID:
-    Type: String
+  Subnets:
+    Type: 'List<AWS::EC2::Subnet::Id>'
 
   AppName:
     Type: String
   Environment:
     Type: String
     Default: 'dev'
-  Subdomain:
-    Type: String
-  Domain:
-    Type: String
 
+  ECSSecurityGroupID:
+    Type: String
   ECSDesiredServiceCount:
     Type: Number
     Default: 1
-  # InitialImage:
-  #   Type: String
+
+  ECRRepositoryURI:
+    Type: String
   ECRRepositoryName:
+    Type: String
+  S3BucketName:
+    Type: String
+
+  ALBTargetGroupARN:
     Type: String
 
   RailsEnv:
     Type: String
+  RailsLogLevel:
+    Type: String
+    Default: 'warn'
+    AllowedValues:
+      - 'debug'
+      - 'warn'
+      - 'error'
+
   DBSecurityGroupID:
     Type: String
+  DBSnapshot:
+    Type: String
+    Default: 'none'
   DBAddress:
     Type: String
   DBPort:
     Type: String
   DBName:
+    Type: String
+  DBUsername:
+    Type: String
+  DBPassword:
     Type: String
 
 Resources:
@@ -47,25 +60,9 @@ Resources:
   # Identitity and Access Management (IAM)
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
   # -----------------------------------------------------------
-  # Role used to deploy the Docker images to the ECS Containers
-  ECSDeployRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: 'Allow'
-            Principal:
-              Service:
-                - 'ec2.amazonaws.com'
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonECS_FullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
 
-  # Role used to build/deploy an ECS Container
-  ECSTaskRole:
+  # Role that grants the ECS container agent permission to make AWS API calls
+  ECSTaskExecutionRole:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -79,14 +76,16 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         # TODO: We should probably pair these back
-        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess'
+        # - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess'
         # - 'arn:aws:iam::aws:policy/AmazonECS_FullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        # - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+        # Adding the following as advised here: https://aws.amazon.com/premiumsupport/knowledge-center/ecs-unable-to-pull-secrets/
+        # - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
+        # - 'kms:Decrypt'
 
-  # IAM Role that the individual ECS containers will use. The containers must be able
-  # to access the RDS database, SSM paramater store and write to CloudWatch
-  ECSContainerRole:
+  # Role that grants containers in the task permission to call AWS APIs on your behalf
+  ECSTaskRole:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -99,206 +98,12 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonRDSDataFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
-        # - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM'
+        - 'arn:aws:iam::aws:policy/AmazonRDSDataFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
 # arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
-
-  ECSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Sub 'Fargate security group for ${AppName}-${Environment}'
-      GroupName: !Sub '${AppName}-ecs-sec'
-      VpcId: !Ref VpcID
-
-  # Allow traffic to the ECS instances
-  ECSSecurityGroupIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    DependsOn:
-      - ECSSecurityGroup
-    Properties:
-      CidrIp: '0.0.0.0/0'
-      IpProtocol: 'tcp'
-      FromPort: 8080
-      ToPort: 8080
-      GroupId: !GetAtt ECSSecurityGroup.GroupId
-
-  ECSSecurityGroupEgress:
-    Type: AWS::EC2::SecurityGroupEgress
-    DependsOn:
-      - ECSSecurityGroup
-    Properties:
-      CidrIp: '0.0.0.0/0'
-      IpProtocol: -1 # All Protocols
-      FromPort: -1 # All Ports
-      ToPort: -1 # All Ports
-      GroupId: !GetAtt ECSSecurityGroup.GroupId
-
-  # Allow the ECS instance(s) to communicate with the RDS instance(s)
-  DBSecurityGroupIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    DependsOn:
-      - ECSSecurityGroup
-    Properties:
-      IpProtocol: -1 # All protocols
-      FromPort: -1 # All ports
-      ToPort: -1 # All ports
-      GroupId: !Ref DBSecurityGroupID
-      SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
-
-  # -----------------------------------------------------------
-  # Elastic Load Balancer (ELB) - Handles which container receives traffic
-  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_ElasticLoadBalancingV2.html
-  # -----------------------------------------------------------
-  ALBTargetGroup:
-    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
-    Properties:
-      Name: !Sub '${AppName}-${Environment}-fargate-targ'
-      HealthCheckEnabled: true
-      HealthCheckIntervalSeconds: 300 # 5 minutes
-      HealthCheckPath: '/'
-      HealthCheckPort: 'traffic-port'
-      # HealthCheckProtocol: 'HTTPS'
-      HealthCheckProtocol: 'HTTP'
-      HealthCheckTimeoutSeconds: 30
-      UnhealthyThresholdCount: 3
-      Matcher:
-        HttpCode: 200
-      VpcId: !Ref VpcID
-      Port: 80
-      Protocol: 'HTTP' # TODO: Switch to HTTPS once the cert if available
-      TargetGroupAttributes:
-        - Key: 'stickiness.enabled'
-          Value: true
-        - Key: 'stickiness.type'
-          Value: 'lb_cookie'
-        - Key: 'stickiness.lb_cookie.duration_seconds'
-          Value: 900 # 15 minutes
-        # TODO: Reenable this once HTTPS
-        # - Key: 'preserve_client_ip.enabled'
-        #   Value: true
-      TargetType: 'ip'
-
-  ALB:
-    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
-    Properties:
-      Type: 'application'
-      Scheme: 'internet-facing'
-      Subnets:
-        - !Ref Subnet1
-        - !Ref Subnet2
-
-  ALBListener:
-    Type: 'AWS::ElasticLoadBalancingV2::Listener'
-    DependsOn:
-      - ALB
-      - ALBTargetGroup
-    Properties:
-      LoadBalancerArn: !Ref ALB
-      DefaultActions:
-        - Type: 'forward'
-          TargetGroupArn: !Ref ALBTargetGroup
-      Port: 80
-      Protocol: 'HTTP'
-      # Protocol: 'HTTPS'
-      # Port: 443
-      # Certificates:
-      #   - CertificateArn: !Ref Certificate
-
-  # -----------------------------------------------------------
-  # Web Application Firewall (WAF) - Stops malicious actors/bots from reaching application
-  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_WAFv2.html
-  # -----------------------------------------------------------
-  WAFRegional:
-    Type: 'AWS::WAFv2::WebACL'
-    Properties:
-      DefaultAction:
-        Allow: {}
-      Scope: 'REGIONAL'
-      VisibilityConfig:
-        SampledRequestsEnabled: true
-        CloudWatchMetricsEnabled: true
-        MetricName: !Sub '${AppName}-${Environment}-waf-metric'
-      Rules:
-        - Name: 'AWS-AWSManagedRulesAmazonIpReputationList'
-          Priority: 0
-          OverrideAction:
-            Count: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: true
-            CloudWatchMetricsEnabled: true
-            MetricName: 'AWS-AWSManagedRulesAmazonIpReputationList'
-          Statement:
-            ManagedRuleGroupStatement:
-              VendorName: 'AWS'
-              Name: 'AWSManagedRulesAmazonIpReputationList'
-              ExcludedRules: []
-        - Name: 'AWS-AWSManagedRulesCommonRuleSet'
-          Priority: 1
-          OverrideAction:
-            Count: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: true
-            CloudWatchMetricsEnabled: true
-            MetricName: 'AWS-AWSManagedRulesCommonRuleSet'
-          Statement:
-            ManagedRuleGroupStatement:
-              VendorName: 'AWS'
-              Name: 'AWSManagedRulesCommonRuleSet'
-              ExcludedRules: []
-        - Name: 'AWS-AWSManagedRulesKnownBadInputsRuleSet'
-          Priority: 2
-          OverrideAction:
-            Count: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: true
-            CloudWatchMetricsEnabled: true
-            MetricName: 'AWS-AWSManagedRulesKnownBadInputsRuleSet'
-          Statement:
-            ManagedRuleGroupStatement:
-              VendorName: 'AWS'
-              Name: 'AWSManagedRulesKnownBadInputsRuleSet'
-              ExcludedRules: []
-
-  WAFACLAssociation:
-    Type: 'AWS::WAFv2::WebACLAssociation'
-    DependsOn:
-      - WAFRegional
-      - ALB
-    Properties:
-      WebACLArn: !GetAtt WAFRegional.Arn
-      ResourceArn: !Ref ALB
-
-  # -----------------------------------------------------------
-  # Route53 - DNS configuration
-  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_Route53.html
-  # -----------------------------------------------------------
-  # Route53RecordSet:
-  #   Type: AWS::Route53::RecordSet
-  #   DependsOn:
-  #     - ALB
-  #   Properties:
-  #     HostedZoneId: !Ref HostedZoneID
-  #     Name: !Ref Subdomain
-  #     Type: A
-  #     # Failover: TODO: we can use this as a maintenance page I think
-  #     AliasTarget:
-  #       DNSName: !GetAtt ALB.DNSName
-  #       HostedZoneId: !Ref HostedZoneID
-  #       # EvaluateTargetHealth: true
-
-  # Certificate:
-  #   Type: AWS::CertificateManager::Certificate
-  #   DependsOn:
-  #     - Route53RecordSet
-  #   Properties:
-  #     DomainName: !Sub '${Subdomain}.${Domain}'
-  #     DomainValidationOptions:
-  #       - DomainName: !Sub '${Subdomain}.${Domain}'
-  #         HostedZoneId: !Ref HostedZoneID
-  #     ValidationMethod: DNS
 
   # -----------------------------------------------------------
   # Elastic Container Service (ECS) - Containers that host the application
@@ -322,31 +127,31 @@ Resources:
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     DependsOn:
-      - ECSContainerRole
+      - ECSTaskExecutionRole
+      - ECSTaskRole
     Properties:
       Cpu: '2048' # 2 vCPU
       Memory: '4096' # 4GB
-      ExecutionRoleArn: !GetAtt ECSTaskRole.Arn
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
       Family: !Sub '${AppName}-${Environment}-fargate'
       NetworkMode: 'awsvpc' # Required for Fargate!
       RuntimePlatform:
         CpuArchitecture: 'ARM64'
         OperatingSystemFamily: 'LINUX'
-      TaskRoleArn: !GetAtt ECSContainerRole.Arn
       # TODO: Return to setup logging config ... super annoying that it forces/requires JSON here
       ContainerDefinitions:
         -
           # Image: !Ref InitialImage
-          Image: !Join
-            - ''
-            - - !Ref AWS::AccountId
-              - '.dkr.ecr.'
-              - !Ref AWS::Region
-              - '.amazonaws.com/'
-              - !Ref ECRRepositoryName
-          Command:
-            - 'cd /usr/src/app && bin/rails db:create && bin/rails db:schema:load && bin/rails db:seed'
-            - 'bundle exec puma -C config/application.rb -p 8086'
+          Image: !Ref ECRRepositoryURI
+          # Command:
+          #   - 'bundle'
+          #   - 'exec'
+          #   - 'puma'
+          #   - '-C'
+          #   - 'config/application.rb'
+          #   - '-p'
+          #   - '8080'
           Cpu: 2
           DisableNetworking: false
           Essential: true
@@ -358,30 +163,45 @@ Resources:
           PortMappings:
             - ContainerPort: 80
               Protocol: 'tcp'
-            - ContainerPort: 8080
+            - ContainerPort: 443
               Protocol: 'tcp'
-            - ContainerPort: 433
-              Protocol: 'tcp'
-          Secrets:
-            - Name: 'DATABASE_USERNAME'
-              ValueFrom: '/uc3/dmp/roadmap/dev/db_app_username'
-            - Name: 'DATABASE_PASSWORD'
-              ValueFrom: '/uc3/dmp/roadmap/dev/db_app_password'
+          # Secrets:
+          #   - Name: 'DATABASE_USERNAME'
+          #     ValueFrom: '/uc3/dmp/roadmap/dev/db_app_username'
+          #   - Name: 'DATABASE_PASSWORD'
+          #     ValueFrom: '/uc3/dmp/roadmap/dev/db_app_password'
           Environment:
             - Name: 'RAILS_ENV'
               Value: !Ref RailsEnv
-            - Name: 'DATABASE_HOST'
+
+            - Name: 'DB_SNAPSHOT'
+              Value: !Ref DBSnapshot
+            - Name: 'DB_HOST'
               Value: !Ref DBAddress
-            - Name: 'DATABASE_PORT'
+            - Name: 'DB_PORT'
               Value: !Ref DBPort
-            - Name: 'DATABASE_NAME'
+            - Name: 'DB_NAME'
               Value: !Ref DBName
+            - Name: 'DB_USERNAME'
+              Value: !Ref DBUsername
+            - Name: 'DB_PASSWORD'
+              Value: !Ref DBPassword
+
+            - Name: 'DRAGONFLY_AWS'
+              Value: true
+            - Name: 'AWS_BUCKET_NAME'
+              Value: !Ref S3BucketName
+            - Name: 'AWS_ACCESS_KEY_ID'
+              Value: ''
+            - Name: 'AWS_SECRET_ACCESS_KEY'
+              Value: ''
+            - Name: 'AWS_REGION'
+              Value: !Ref AWS::Region
 
   # Container Service definition
   ECSService:
     Type: 'AWS::ECS::Service'
     DependsOn:
-      - ALBListener
       - ECSTaskDefinition
     Properties:
       Cluster: !Ref ECSCluster
@@ -391,17 +211,16 @@ Resources:
       HealthCheckGracePeriodSeconds: 300 # 5 minutes for app startup
       LaunchType: 'FARGATE'
       LoadBalancers:
-        - TargetGroupArn: !Ref ALBTargetGroup
-          ContainerPort: 80
+        - TargetGroupArn: !Ref ALBTargetGroupARN
+          ContainerPort: 443
           ContainerName: !Ref AppName
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
-            - !GetAtt ECSSecurityGroup.GroupId
-          AssignPublicIp: 'DISABLED'
-          Subnets:
-            - !Ref Subnet1
-            - !Ref Subnet2
+            - !Ref ECSSecurityGroupID
+            - !Ref DBSecurityGroupID
+          AssignPublicIp: 'ENABLED'
+          Subnets: !Ref Subnets
       PlatformVersion: 'LATEST'
       PropagateTags: 'TASK_DEFINITION'
       SchedulingStrategy: 'REPLICA'
@@ -418,33 +237,6 @@ Resources:
   # -----------------------------------------------------------
 
 Outputs:
-  # DomainName:
-  #   Value: !Ref Route53RecordSet
-
-  # SSLCertArn:
-  #   Value: !Ref Certificate
-
-  WafRegionalAclId:
-    Value: !Ref WAFRegional
-  WafRegionalAclArn:
-    Value: !GetAtt WAFRegional.Arn
-
-  ALBTargetGroupArn:
-    Value: !Ref ALBTargetGroup
-  ALBTargetGroupFullName:
-    Value: !GetAtt ALBTargetGroup.TargetGroupFullName
-
-  ALBArn:
-    Value: !Ref ALB
-  ALBFullName:
-    Value: !GetAtt ALB.LoadBalancerFullName
-  ALBDNSName:
-    Value: !GetAtt ALB.DNSName
-  ALBListernerId:
-    Value: !Ref ALBListener
-  ALBListenerArn:
-    Value: !GetAtt ALBListener.Arn
-
   ECSFargateClusterId:
     Value: !Ref ECSCluster
   ECSFargateClusterArn:
@@ -455,4 +247,3 @@ Outputs:
     Value: !GetAtt ECSService.Name
   ECSTaskId:
     Value: !Ref ECSTaskDefinition
-

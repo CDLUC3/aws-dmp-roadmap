@@ -1,0 +1,252 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: 'Serverless architecture for the DMPRoadmap system'
+
+Parameters:
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+  Subnets:
+    Type: 'List<AWS::EC2::Subnet::Id>'
+  HostedZoneID:
+    Type: 'AWS::Route53::HostedZone::Id'
+
+  AppName:
+    Type: String
+  Environment:
+    Type: String
+    Default: 'dev'
+  Subdomain:
+    Type: String
+  Domain:
+    Type: String
+
+Resources:
+  # -----------------------------------------------------------
+  # EC2 Security Groups for ECS containers (see their definitions in application.yaml)
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+  # -----------------------------------------------------------
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Fargate security group for ${AppName}-${Environment}'
+      GroupName: !Sub '${AppName}-ecs-sec'
+      VpcId: !Ref VpcID
+
+  # Allow traffic to the ECS instances
+  ECSSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn:
+      - ECSSecurityGroup
+    Properties:
+      IpProtocol: 'tcp'
+      FromPort: 80
+      ToPort: 80
+      GroupId: !GetAtt ECSSecurityGroup.GroupId
+      SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
+
+  # -----------------------------------------------------------
+  # Elastic Load Balancer (ELB) - Handles which container receives traffic
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_ElasticLoadBalancingV2.html
+  # -----------------------------------------------------------
+  ALBTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      Name: !Sub '${AppName}-${Environment}-fargate-targ'
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 300 # 5 minutes
+      HealthCheckPath: '/'
+      HealthCheckPort: 'traffic-port'
+      # HealthCheckProtocol: 'HTTPS'
+      HealthCheckProtocol: 'HTTP'
+      HealthCheckTimeoutSeconds: 30
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      VpcId: !Ref VpcID
+      Port: 443
+      Protocol: 'HTTP' # TODO: Switch to HTTPS once the cert if available
+      TargetGroupAttributes:
+        - Key: 'stickiness.enabled'
+          Value: true
+        - Key: 'stickiness.type'
+          Value: 'lb_cookie'
+        - Key: 'stickiness.lb_cookie.duration_seconds'
+          Value: 900 # 15 minutes
+        # TODO: Reenable this once HTTPS
+        # - Key: 'preserve_client_ip.enabled'
+        #   Value: true
+      TargetType: 'ip'
+
+  ALB:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Type: 'application'
+      Scheme: 'internet-facing'
+      SecurityGroups:
+        - !GetAtt ECSSecurityGroup.GroupId
+      Subnets: !Ref Subnets
+
+  # Listener that redirects all HTTP traffic to HTTPS
+  ALBListenerHTTP:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn:
+      - ALB
+      - ALBTargetGroup
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      DefaultActions:
+        - Type: 'redirect'
+          RedirectConfig:
+            Protocol: 'HTTPS'
+            Port: 443
+            Host: '#{host}'
+            Path: '/#{path}'
+            Query: '#{query}'
+            StatusCode: 'HTTP_301'
+      Protocol: 'HTTP'
+      Port: 80
+
+  # HTTPS Listener that sends traffic to the ALB
+  ALBListenerHTTPS:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn:
+      - ALB
+      - ALBTargetGroup
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      DefaultActions:
+        - Type: 'forward'
+          TargetGroupArn: !Ref ALBTargetGroup
+      Protocol: 'HTTPS'
+      Port: 443
+      Certificates:
+        - CertificateArn: !Ref Certificate
+
+  # -----------------------------------------------------------
+  # Route53 - DNS configuration
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_Route53.html
+  # -----------------------------------------------------------
+  Route53RecordSet:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - ALB
+    Properties:
+      HostedZoneId: !Ref HostedZoneID
+      Name: !Sub '${Subdomain}.${Domain}'
+      Type: A
+      # Failover: TODO: we can use this as a maintenance page I think
+      AliasTarget:
+        DNSName: !GetAtt ALB.DNSName
+        HostedZoneId: !GetAtt ALB.CanonicalHostedZoneID
+        # EvaluateTargetHealth: true
+
+  # -----------------------------------------------------------
+  # SSL cert
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-certificatemanager-certificate.html
+  # -----------------------------------------------------------
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    DependsOn:
+      - Route53RecordSet
+    Properties:
+      DomainName: !Sub '${Subdomain}.${Domain}'
+      DomainValidationOptions:
+        - DomainName: !Sub '${Subdomain}.${Domain}'
+          HostedZoneId: !Ref HostedZoneID
+      ValidationMethod: 'DNS'
+
+  # -----------------------------------------------------------
+  # Web Application Firewall (WAF) - Stops malicious actors/bots from reaching application
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_WAFv2.html
+  # -----------------------------------------------------------
+  WAFRegional:
+    Type: 'AWS::WAFv2::WebACL'
+    Properties:
+      DefaultAction:
+        Allow: {}
+      Scope: 'REGIONAL'
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub '${AppName}-${Environment}-waf-metric'
+      Rules:
+        - Name: 'AWS-AWSManagedRulesAmazonIpReputationList'
+          Priority: 0
+          OverrideAction:
+            Count: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: 'AWS-AWSManagedRulesAmazonIpReputationList'
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: 'AWS'
+              Name: 'AWSManagedRulesAmazonIpReputationList'
+              ExcludedRules: []
+        - Name: 'AWS-AWSManagedRulesCommonRuleSet'
+          Priority: 1
+          OverrideAction:
+            Count: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: 'AWS-AWSManagedRulesCommonRuleSet'
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: 'AWS'
+              Name: 'AWSManagedRulesCommonRuleSet'
+              ExcludedRules: []
+        - Name: 'AWS-AWSManagedRulesKnownBadInputsRuleSet'
+          Priority: 2
+          OverrideAction:
+            Count: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: 'AWS-AWSManagedRulesKnownBadInputsRuleSet'
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: 'AWS'
+              Name: 'AWSManagedRulesKnownBadInputsRuleSet'
+              ExcludedRules: []
+
+  WAFACLAssociation:
+    Type: 'AWS::WAFv2::WebACLAssociation'
+    DependsOn:
+      - WAFRegional
+      - ALB
+    Properties:
+      WebACLArn: !GetAtt WAFRegional.Arn
+      ResourceArn: !Ref ALB
+
+Outputs:
+  DomainName:
+    Value: !Ref Route53RecordSet
+
+  SSLCertArn:
+    Value: !Ref Certificate
+
+  WafRegionalAclId:
+    Value: !Ref WAFRegional
+  WafRegionalAclArn:
+    Value: !GetAtt WAFRegional.Arn
+
+  ALBTargetGroupArn:
+    Value: !Ref ALBTargetGroup
+  ALBTargetGroupFullName:
+    Value: !GetAtt ALBTargetGroup.TargetGroupFullName
+
+  ALBArn:
+    Value: !Ref ALB
+  ALBFullName:
+    Value: !GetAtt ALB.LoadBalancerFullName
+  ALBDNSName:
+    Value: !GetAtt ALB.DNSName
+  HTTPListenerId:
+    Value: !Ref ALBListenerHTTP
+  HTTSPListenerId:
+    Value: !Ref ALBListenerHTTPS
+
+  ECSSecurityGroupId:
+    Value: !GetAtt ECSSecurityGroup.GroupId

@@ -6,6 +6,7 @@ sceptre_user_data:
   application: 'uc3-dmp-roadmap'
   env: 'dev'
   rails_env: 'stage'
+  rails_log_level: 'debug'
 
 stack_tags:
   Program: 'uc3'

@@ -3,24 +3,37 @@ template:
   type: 'file'
 
 parameters:
-  VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
-  Subnet1: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
-  Subnet2: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
-  HostedZoneID: !stack_output_external sceptre-uc3-ops-common-dev-route53::HostedZoneID
+  Subnets:
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
-  Subdomain: !stack_attr sceptre_user_data.subdomain
-  Domain: !stack_attr sceptre_user_data.domain
 
+  ECSSecurityGroupID: !stack_output dev/frontend.yaml::ECSSecurityGroupId
   ECSDesiredServiceCount: '1'
-  # InitialImage: !environment_variable DMPROADMAP_INITIAL_IMAGE
+
+  ECRRepositoryURI: !stack_output dev/data.yaml::ECRRepositoryURI
   ECRRepositoryName: !stack_output dev/data.yaml::ECRRepositoryName
+  S3BucketName: !stack_output dev/data.yaml::S3BucketName
+
+  ALBTargetGroupARN: !stack_output dev/frontend.yaml::ALBTargetGroupArn
 
   RailsEnv: !stack_attr sceptre_user_data.rails_env
+  RailsLogLevel: !stack_attr sceptre_user_data.rails_log_level
+
   DBSecurityGroupID: !stack_output dev/data.yaml::DBSecurityGroupID
   DBAddress: !stack_output dev/data.yaml::DBAddress
   DBPort: !stack_output dev/data.yaml::DBPort
   DBName: !stack_output dev/data.yaml::DBName
-  # Credentials are stored in SSM parameter store and will be retrieved from within the template
 
+  # Credentials are stored in SSM parameter store as `db_app_username` and `db_app_password`
+  # and will be retrieved from within the template and set as ENV variables within the ECS
+  # containers. You can override those values here:
+  DBUsername: !ssm_parameter /uc3/dmp/roadmap/dev/db_app_username
+  DBPassword: !ssm_parameter /uc3/dmp/roadmap/dev/db_app_password
+
+  # If you have an existing RDS snapshot of your DB, you can include it here and CF will
+  # restore that snapshot. If not, just leave this commented out and Docker will initialize the DB
+  # DBSnapshot: 'ARN of my DBSnapshotIdentifier'

@@ -4,14 +4,22 @@ template:
 
 parameters:
   VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
-  Subnet1: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
-  Subnet2: !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+  # TODO: figure out why Subnet outputs are incorrect in CF. Pref would be to call
+  #       !stack_output_external like in application.yaml
+  Subnets:
+    - 'subnet-0b6ce38d6c451c40c'
+    - 'subnet-007d03c7b2d5867c9'
+    - 'subnet-01df5798fad9d5a9d'
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
 
   ECRLifecyclePolicyTagPrefix: 'v'
   ECRLifecyclePolicyImagesToRetain: '5'
+
+  # If you have an existing RDS snapshot of your DB, you can include it here and CF will
+  # restore that snapshot. If not, just leave this commented out and Docker will initialize the DB
+  # DBSnapshot: 'ARN of my DBSnapshotIdentifier'
 
   DBInstanceType: 'db.t3.micro'
   # Valid options are based on the DB engine.
@@ -20,7 +28,11 @@ parameters:
   DBName: 'roadmap'
   DBEngine: 'MySQL'
 
-  # Credentials are stored in SSM parameter store and will be retrieved by default. You can
-  # override them here though if necessary (see template for SSM parameter names):
-  # DBAUsername: 'root'
-  # DBAPassword: ''
+# TODO: Get Ashley's help to get this hook working/installed.
+#       The hook builds the docker image and pushes it to the ECR
+# hooks:
+  # after_create:
+    # - !ecr_publisher
+    #   ecr_uri: !stack_output dev/data.yaml::ECRRepositoryName
+    #   dockerfile_dir: '../application'
+    #   ecr_image_tag: 'latest'
