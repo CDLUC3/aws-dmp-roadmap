@@ -5,7 +5,14 @@ RUN echo $(apt-cache search magick)
 # Install packages
 RUN apt-get clean
 RUN apt-get update -qq && apt-get install -y build-essential libgmp3-dev libpq-dev vim git \
+                                             apt-transport-https curl software-properties-common \
                                              imagemagick default-mysql-client
+
+# Add the nodejs repository to apt-get
+RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
+RUN apt-get install -y nodejs
+RUN apt-get update
+# && apt-get install -y yarn
 
 # Env variables for application
 ENV DB_ADAPTER=mysql2
@@ -41,13 +48,11 @@ RUN gem install bundler
 RUN bundle config set without 'pgsql thin rollbar'
 RUN mkdir pid
 
-# Install Node and run Yarn
-# RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-# RUN apt-get install -y nodejs
-# RUN npm install -g yarn
-
 # Load dependencies
 RUN bundle install --jobs 20 --retry 5
+
+# Install and run Yarn
+RUN npm install -g yarn
 RUN yarn install
 
 # Initialize config files and then build the credentials file
