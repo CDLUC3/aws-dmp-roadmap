@@ -7,19 +7,24 @@ parameters:
   # TODO: figure out why Subnet outputs are incorrect in CF. Pref would be to call
   #       !stack_output_external like in application.yaml
   Subnets:
-    - 'subnet-0b6ce38d6c451c40c'
-    - 'subnet-007d03c7b2d5867c9'
-    - 'subnet-01df5798fad9d5a9d'
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
+    # TODO: Switched to public subnets to see if ECS could talk to RDS ... did not work
+    #       switching back requires stak deletion
+    # - 'subnet-0b6ce38d6c451c40c'
+    # - 'subnet-007d03c7b2d5867c9'
+    # - 'subnet-01df5798fad9d5a9d'
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
 
-  ECRLifecyclePolicyTagPrefix: 'v'
-  ECRLifecyclePolicyImagesToRetain: '5'
+  ECRLifecyclePolicyTagPrefix: 'latest'
 
   # If you have an existing RDS snapshot of your DB, you can include it here and CF will
   # restore that snapshot. If not, just leave this commented out and Docker will initialize the DB
   # DBSnapshot: 'ARN of my DBSnapshotIdentifier'
+  DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'
 
   DBInstanceType: 'db.t3.micro'
   # Valid options are based on the DB engine.
@@ -27,6 +32,11 @@ parameters:
   DBSizeGB: '20'
   DBName: 'roadmap'
   DBEngine: 'MySQL'
+
+  # TODO: Generate these on the fly and add them to SecretsManager
+  #
+  # DBAUsername: 'roadmapDba'
+  # DBAPassword: !password_generator 12
 
 # TODO: Get Ashley's help to get this hook working/installed.
 #       The hook builds the docker image and pushes it to the ECR

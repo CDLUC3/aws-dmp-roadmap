@@ -4,6 +4,8 @@ Transform: AWS::Serverless-2016-10-31
 Description: 'Serverless architecture for the DMPRoadmap system'
 
 Parameters:
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
   Subnets:
     Type: 'List<AWS::EC2::Subnet::Id>'
 
@@ -12,9 +14,9 @@ Parameters:
   Environment:
     Type: String
     Default: 'dev'
-
-  ECSSecurityGroupID:
+  DomainName:
     Type: String
+
   ECSDesiredServiceCount:
     Type: Number
     Default: 1
@@ -23,10 +25,15 @@ Parameters:
     Type: String
   ECRRepositoryName:
     Type: String
-  S3BucketName:
-    Type: String
+
+  # S3BucketName:
+  #   Type: String
+  # S3SecurityGroupID:
+  #   Type: String
 
   ALBTargetGroupARN:
+    Type: String
+  ALBSecurityGroupID:
     Type: String
 
   RailsEnv:
@@ -60,7 +67,6 @@ Resources:
   # Identitity and Access Management (IAM)
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
   # -----------------------------------------------------------
-
   # Role that grants the ECS container agent permission to make AWS API calls
   ECSTaskExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -75,14 +81,8 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
-        # TODO: We should probably pair these back
-        # - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess'
-        # - 'arn:aws:iam::aws:policy/AmazonECS_FullAccess'
-        # - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
-        # Adding the following as advised here: https://aws.amazon.com/premiumsupport/knowledge-center/ecs-unable-to-pull-secrets/
-        # - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
-        # - 'kms:Decrypt'
+        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
   # Role that grants containers in the task permission to call AWS APIs on your behalf
   ECSTaskRole:
@@ -100,10 +100,95 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonRDSDataFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        # - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
-# arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
+  # -----------------------------------------------------------
+  # EC2 Security Groups for ECS containers (see their definitions in application.yaml)
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+  # -----------------------------------------------------------
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub 'Fargate security group for ${AppName}-${Environment}'
+      GroupName: !Sub '${AppName}-ecs-sec'
+      VpcId: !Ref VpcID
+
+  # Allow traffic to the ECS instances from the ALB
+  ECSSecurityGroupIngressFromALB:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn:
+      - ECSSecurityGroup
+    Properties:
+      IpProtocol: 'tcp'
+      FromPort: 80
+      ToPort: 80
+      GroupId: !GetAtt ECSSecurityGroup.GroupId
+      SourceSecurityGroupId: !Ref ALBSecurityGroupID
+
+  # Allow the ECS instance(s) to call the RDS instance(s)
+  # ECSSecurityGroupEgressToRDS:
+  #   Type: AWS::EC2::SecurityGroupEgress
+  #   Properties:
+  #     IpProtocol: 'tcp'
+  #     FromPort: 3306
+  #     ToPort: 3306
+  #     GroupId: !GetAtt ECSSecurityGroup.GroupId
+  #     DestinationSecurityGroupId: !Ref DBSecurityGroupID
+
+  # Allow the ECS instance(s) to respond to the ALB
+  # ECSSecurityGroupEgressToALB:
+  #   Type: AWS::EC2::SecurityGroupEgress
+  #   Properties:
+  #     IpProtocol: 'tcp'
+  #     FromPort: 80
+  #     ToPort: 80
+  #     GroupId: !GetAtt ECSSecurityGroup.GroupId
+  #     DestinationSecurityGroupId: !Ref ALBSecurityGroupID
+
+  # Allow the S3 bucket to accept traffic from the ECS instance(s)
+  # S3SecurityGroupIngressFromECS:
+  #   Type: AWS::EC2::SecurityGroupIngress
+  #   DependsOn:
+  #     - ECSSecurityGroup
+  #   Properties:
+  #     IpProtocol: 'tcp'
+  #     FromPort: 80
+  #     ToPort: 80
+  #     GroupId: !Ref S3SecurityGroupID
+  #     SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
+
+  # Allow the RDS instance to respond to the ECS instance(s)
+  # S3SecurityGroupEgressToECS:
+  #   Type: AWS::EC2::SecurityGroupEgress
+  #   Properties:
+  #     IpProtocol: 'tcp'
+  #     FromPort: 80
+  #     ToPort: 80
+  #     GroupId: !Ref S3SecurityGroupID
+  #     DestinationSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
+
+  # Allow the RDS instance(s) to receive traffic from the ECS instance(s)
+  DBSecurityGroupIngressFromECS:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn:
+      - ECSSecurityGroup
+    Properties:
+      IpProtocol: 'tcp'
+      FromPort: 3306
+      ToPort: 3306
+      GroupId: !Ref DBSecurityGroupID
+      SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
+
+  # Allow the RDS instance to respond to the ECS instance(s)
+  # DBSecurityGroupEgressToECS:
+  #   Type: AWS::EC2::SecurityGroupEgress
+  #   Properties:
+  #     IpProtocol: 'tcp'
+  #     FromPort: 3306
+  #     ToPort: 3306
+  #     GroupId: !Ref DBSecurityGroupID
+  #     DestinationSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
 
   # -----------------------------------------------------------
   # Elastic Container Service (ECS) - Containers that host the application
@@ -137,21 +222,11 @@ Resources:
       Family: !Sub '${AppName}-${Environment}-fargate'
       NetworkMode: 'awsvpc' # Required for Fargate!
       RuntimePlatform:
-        CpuArchitecture: 'ARM64'
+        CpuArchitecture: 'X86_64'
         OperatingSystemFamily: 'LINUX'
-      # TODO: Return to setup logging config ... super annoying that it forces/requires JSON here
       ContainerDefinitions:
         -
-          # Image: !Ref InitialImage
           Image: !Ref ECRRepositoryURI
-          # Command:
-          #   - 'bundle'
-          #   - 'exec'
-          #   - 'puma'
-          #   - '-C'
-          #   - 'config/application.rb'
-          #   - '-p'
-          #   - '8080'
           Cpu: 2
           DisableNetworking: false
           Essential: true
@@ -160,11 +235,22 @@ Resources:
           Name: !Ref AppName
           StartTimeout: 180
           StopTimeout: 60
+          # TODO: Figure out why this is invalid for FARGATE
+          LogConfiguration:
+            LogDriver: 'awslogs'
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-create-group: true
+              awslogs-group: !Sub '${AppName}-${Environment}-ecs'
+              awslogs-stream-prefix: !Sub '${Environment}-ecs'
           PortMappings:
             - ContainerPort: 80
               Protocol: 'tcp'
-            - ContainerPort: 443
+            - ContainerPort: 3306
               Protocol: 'tcp'
+          # TODO: See if there is a way for Rails to use these. Passing in Env is not recommended
+          #       for passwords/secrets
+          #
           # Secrets:
           #   - Name: 'DATABASE_USERNAME'
           #     ValueFrom: '/uc3/dmp/roadmap/dev/db_app_username'
@@ -173,6 +259,13 @@ Resources:
           Environment:
             - Name: 'RAILS_ENV'
               Value: !Ref RailsEnv
+            - Name: 'RAILS_LOG_LEVEL'
+              Value: !Ref RailsLogLevel
+            - Name: 'RAILS_LOG_TO_STDOUT'
+              Value: true
+
+            - Name: 'DMPROADMAP_HOST'
+              Value: !Ref DomainName
 
             - Name: 'DB_SNAPSHOT'
               Value: !Ref DBSnapshot
@@ -188,15 +281,7 @@ Resources:
               Value: !Ref DBPassword
 
             - Name: 'DRAGONFLY_AWS'
-              Value: true
-            - Name: 'AWS_BUCKET_NAME'
-              Value: !Ref S3BucketName
-            - Name: 'AWS_ACCESS_KEY_ID'
-              Value: ''
-            - Name: 'AWS_SECRET_ACCESS_KEY'
-              Value: ''
-            - Name: 'AWS_REGION'
-              Value: !Ref AWS::Region
+              Value: false
 
   # Container Service definition
   ECSService:
@@ -212,29 +297,21 @@ Resources:
       LaunchType: 'FARGATE'
       LoadBalancers:
         - TargetGroupArn: !Ref ALBTargetGroupARN
-          ContainerPort: 443
+          ContainerPort: 80
           ContainerName: !Ref AppName
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
-            - !Ref ECSSecurityGroupID
+            - !GetAtt ECSSecurityGroup.GroupId
+            - !Ref ALBSecurityGroupID
             - !Ref DBSecurityGroupID
+            # - !Ref S3SecurityGroupID
           AssignPublicIp: 'ENABLED'
           Subnets: !Ref Subnets
       PlatformVersion: 'LATEST'
       PropagateTags: 'TASK_DEFINITION'
       SchedulingStrategy: 'REPLICA'
       TaskDefinition: !Ref ECSTaskDefinition
-
-  # -----------------------------------------------------------
-  # CodeBuild
-  #   See:
-  # -----------------------------------------------------------
-
-  # -----------------------------------------------------------
-  # CodePipeline
-  #   See:
-  # -----------------------------------------------------------
 
 Outputs:
   ECSFargateClusterId:

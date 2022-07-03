@@ -5,7 +5,7 @@ sceptre_user_data:
   domain: !ssm_parameter /uc3/dmp/dev/hosted_zone_name
   application: 'uc3-dmp-roadmap'
   env: 'dev'
-  rails_env: 'stage'
+  rails_env: 'ci'
   rails_log_level: 'debug'
 
 stack_tags:

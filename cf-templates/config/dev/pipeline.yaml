@@ -1,0 +1,7 @@
+template:
+  path: 'pipeline.yaml'
+  type: 'file'
+
+parameters:
+  Environment: !stack_attr sceptre_user_data.env
+  AppName: !stack_attr sceptre_user_data.application

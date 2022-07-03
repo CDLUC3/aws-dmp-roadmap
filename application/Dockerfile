@@ -12,25 +12,9 @@ RUN apt-get update -qq && apt-get install -y build-essential libgmp3-dev libpq-d
 RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
 RUN apt-get install -y nodejs
 RUN apt-get update
-# && apt-get install -y yarn
 
 # Env variables for application
 ENV DB_ADAPTER=mysql2
-
-# ARG INSTALL_PATH=/usr/src/app
-# ENV INSTALL_PATH=$INSTALL_PATH
-# ENV BUNDLE_PATH=/bundle/ \
-#     BUNDLE_BIN=/bundle/bin \
-#     GEM_HOME=/bundle
-# ENV Path="${BUNDLE_BIN}:${PATH}"
-
-# WORKDIR $INSTALL_PATH
-
-# Adding gems
-# COPY roadmap/Gemfile Gemfile
-# COPY roadmap/Gemfile.lock Gemfile.lock
-# COPY roadmap/package.json package.json
-# COPY roadmap/yarn.lock yarn.lock
 
 # Adding project files
 COPY roadmap .
@@ -55,25 +39,25 @@ RUN bundle install --jobs 20 --retry 5
 RUN npm install -g yarn
 RUN yarn install
 
-# Initialize config files and then build the credentials file
-RUN cp config/database.yml.sample config/database.yml
-RUN cp config/initializers/contact_us.rb.example config/initializers/contact_us.rb
-RUN cp config/initializers/wicked_pdf.rb.example config/initializers/wicked_pdf.rb
+# Copy the custom config files for Docker
+COPY overrides/config/database.yml config/database.yml
+COPY overrides/config/webpacker.yml config/webpacker.yml
+COPY overrides/config/environments/ci.rb config/environments/ci.rb
+COPY overrides/config/initializers/dragonfly.rb config/initializers/dragonfly.rb
+COPY overrides/config/initializers/wicked_pdf.rb config/initializers/wicked_pdf.rb
+COPY overrides/config/webpack/ci.js config/webpack/ci.js
+
+# Initialize the credentials file
 RUN EDITOR='echo "$(cat config/credentials.yml.example)" >' bin/rails credentials:edit
 
 # SETUP ENV variables
 RUN export WICKED_PDF_PATH=`which wkhtmltopdf`
 
-# Precompile the assets if the DB_NAME is present
-RUN if ["$DB_NAME"] ; then $INSTALL_PATH/bin/rails assets:precompile ; fi
+# Copy the startup script into the container
+COPY --chown=755 overrides/docker-startup.rb ./docker-startup.rb
 
 # expose correct port
-EXPOSE 80 443
+EXPOSE 80 443 3306
 
-CMD ["echo", "HELLO"]
-
-# CMD ["bin/puma", "-C", "config/application.rb", "-p", "3000"]
-
-# Don't bother with the Command here, the AWS ECS orchestration passes this command when deploying
-# CMD ["bundle", "exec", "puma", "-C", "config/application.rb", "-p", "8086"]
-# CMD ["echo", "'It worked!'"]
+CMD ["ruby", "docker-startup.rb"]
+# CMD ["puma", "-C", "./config/application.rb", "-p", "80"]

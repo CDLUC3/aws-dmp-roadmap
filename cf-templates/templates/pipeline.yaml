@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: 'Code build and pipeline for the DMPRoadmap system'
+
+Parameters:
+  AppName:
+    Type: String
+  Environment:
+    Type: String
+    Default: 'dev'
+
+Resources:
+
+  # -----------------------------------------------------------
+  # Identitity and Access Management (IAM)
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
+  # -----------------------------------------------------------
+
+# arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
+
+  # -----------------------------------------------------------
+  # CodeBuild
+  #   See:
+  # -----------------------------------------------------------
+
+  # -----------------------------------------------------------
+  # CodePipeline
+  #   See:
+  # -----------------------------------------------------------
+
+Outputs:
+

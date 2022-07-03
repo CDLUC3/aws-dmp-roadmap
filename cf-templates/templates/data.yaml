@@ -17,10 +17,7 @@ Parameters:
 
   ECRLifecyclePolicyTagPrefix:
     Type: String
-    Default: 'v'
-  ECRLifecyclePolicyImagesToRetain:
-    Type: Number
-    Default: 5
+    Default: 'latest'
 
   DBSnapshot:
     Type: String
@@ -43,6 +40,11 @@ Conditions:
     !Not [!Equals [!Ref DBSnapshot, 'none']]
 
 Resources:
+  # TODO: Consider creating the SSM parameters instead of feeding them in
+  #       https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssm-parameter.html
+  #
+  # CloudFormation doesn't support SecureString for some reason so we should use secrets
+
   # -----------------------------------------------------------
   # Elastic Container Repository (ECR) - Hosts the application's Docker images
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_ECR.html
@@ -54,6 +56,8 @@ Resources:
       ImageScanningConfiguration:
         ScanOnPush: true
       LifecyclePolicy:
+        # TODO: Update this to only keep the last 3 snapshots of 'untagged' since we
+        #       are using 'latest' as the only tag.
         LifecyclePolicyText: !Sub >
           {
             "rules": [
@@ -63,50 +67,84 @@ Resources:
                 },
                 "selection": {
                   "countType": "imageCountMoreThan",
-                  "countNumber": ${ECRLifecyclePolicyImagesToRetain},
+                  "countNumber": 1,
                   "tagStatus": "tagged",
                   "tagPrefixList": [
                     "${ECRLifecyclePolicyTagPrefix}"
                   ]
                 },
-                "description": "Only retain the last ${ECRLifecyclePolicyImagesToRetain} versions",
+                "description": "Ensure that we do not have more than 1 tagged version",
                 "rulePriority": 1
+              },
+              {
+                "action": {
+                  "type": "expire"
+                },
+                "selection": {
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 3,
+                  "tagStatus": "untagged"
+                },
+                "description": "Only retain the last 3 versions",
+                "rulePriority": 2
               }
             ]
           }
 
   # -----------------------------------------------------------
+  # Identitity and Access Management (IAM)
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
+  # -----------------------------------------------------------
+  DBMonitoringRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'monitoring.rds.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole'
+
+  # -----------------------------------------------------------
   # S3 Bucket for the application to store logos
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_S3.html
   # -----------------------------------------------------------
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      PublicAccessBlockConfiguration:
-        RestrictPublicBuckets: true
+  #
+  # TODO: The Dragonfly gem allows for storing logos in an S3 bucket but it uses Fog::Aws
+  #       which requires an AWS access key and secret. We may need to fork the dragonfly
+  #       s3 storage gem and modify it to use direct AWS sdk libraries since the bucket
+  #       and ECS instances are running in the same VPC
+  #         See: https://github.com/fog/fog-aws
+  #              https://github.com/markevans/dragonfly-s3_data_store
+  #
+  # S3Bucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties:
+  #     PublicAccessBlockConfiguration:
+  #       RestrictPublicBuckets: true
 
   # -----------------------------------------------------------
-  # EC2 Security Groups for use with RDS database and ECS instances
+  # EC2 Security Groups for use with RDS database and S3 Bucket
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
   # -----------------------------------------------------------
+  # S3SecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: !Sub 'S3 security group for ${AppName}-${Environment}'
+  #     GroupName: !Sub '${AppName}-s3-sec'
+  #     VpcId: !Ref VpcID
+
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub 'RDS security group for ${AppName}-${Environment}'
-      GroupName: !Sub '${AppName}-${Environment}-sec'
+      GroupName: !Sub '${AppName}-rds-sec'
       VpcId: !Ref VpcID
-
-  # Allow the ECS instance(s) to communicate with the RDS instance(s)
-  DBSecurityGroupIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    DependsOn:
-      - DBSecurityGroup
-    Properties:
-      IpProtocol: 'tcp'
-      FromPort: 3306
-      ToPort: 3306
-      GroupId: !GetAtt DBSecurityGroup.GroupId
-      SourceSecurityGroupId: !GetAtt DBSecurityGroup.GroupId
 
   # -----------------------------------------------------------
   # Relational Database Service (RDS) - DB for the application
@@ -131,9 +169,9 @@ Resources:
 
       # If an RDS Snapshot was defined, then instruct CF to restore it
       DBSnapshotIdentifier: !If
-          - InitializeDB
-          - !Ref DBSnapshot
-          - !Ref AWS::NoValue
+        - InitializeDB
+        - !Ref DBSnapshot
+        - !Ref AWS::NoValue
 
       PubliclyAccessible: false
       AllowMajorVersionUpgrade: true
@@ -144,8 +182,8 @@ Resources:
       Port: '3306'
       Engine: !Ref DBEngine
       EngineVersion: '8.0.16'
-      # MonitoringInterval: '60'
-      # MonitoringRoleArn: 'arn:aws:iam::123456789012:role/rds-monitoring-role'
+      MonitoringInterval: '60'
+      MonitoringRoleArn: !GetAtt DBMonitoringRole.Arn
       DBName: !Ref DBName
       DBInstanceClass: !Ref DBInstanceType
       MasterUsername: '{{resolve:ssm:/uc3/dmp/roadmap/dev/db_dba_username}}'
@@ -159,12 +197,12 @@ Outputs:
   ECRRepositoryURI:
     Value: !GetAtt ECRRepository.RepositoryUri
 
-  S3BucketName:
-    Value: !Ref S3Bucket
-  S3BucketARN:
-    Value: !GetAtt S3Bucket.Arn
-  S3BucketURL:
-    Value: !GetAtt S3Bucket.WebsiteURL
+  # S3BucketName:
+  #   Value: !Ref S3Bucket
+  # S3BucketARN:
+  #   Value: !GetAtt S3Bucket.Arn
+  # S3BucketURL:
+  #   Value: !GetAtt S3Bucket.WebsiteURL
 
   DBInstanceName:
     Value: !Ref Database
@@ -175,5 +213,7 @@ Outputs:
   DBName:
     Value: !Ref DBName
 
+  # S3SecurityGroupID:
+  #   Value: !GetAtt S3SecurityGroup.GroupId
   DBSecurityGroupID:
     Value: !GetAtt DBSecurityGroup.GroupId

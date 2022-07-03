@@ -3,6 +3,7 @@ template:
   type: 'file'
 
 parameters:
+  VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
   Subnets:
     - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
     - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
@@ -10,15 +11,18 @@ parameters:
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
+  DomainName: !stack_output dev/frontend.yaml::DomainName
 
-  ECSSecurityGroupID: !stack_output dev/frontend.yaml::ECSSecurityGroupId
   ECSDesiredServiceCount: '1'
 
   ECRRepositoryURI: !stack_output dev/data.yaml::ECRRepositoryURI
   ECRRepositoryName: !stack_output dev/data.yaml::ECRRepositoryName
-  S3BucketName: !stack_output dev/data.yaml::S3BucketName
+
+  # S3BucketName: !stack_output dev/data.yaml::S3BucketName
+  # S3SecurityGroupID: !stack_output dev/data.yaml::S3SecurityGroupID
 
   ALBTargetGroupARN: !stack_output dev/frontend.yaml::ALBTargetGroupArn
+  ALBSecurityGroupID: !stack_output dev/frontend.yaml::ALBSecurityGroupID
 
   RailsEnv: !stack_attr sceptre_user_data.rails_env
   RailsLogLevel: !stack_attr sceptre_user_data.rails_log_level
@@ -31,9 +35,10 @@ parameters:
   # Credentials are stored in SSM parameter store as `db_app_username` and `db_app_password`
   # and will be retrieved from within the template and set as ENV variables within the ECS
   # containers. You can override those values here:
-  DBUsername: !ssm_parameter /uc3/dmp/roadmap/dev/db_app_username
-  DBPassword: !ssm_parameter /uc3/dmp/roadmap/dev/db_app_password
+  DBUsername: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_username
+  DBPassword: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_password
 
   # If you have an existing RDS snapshot of your DB, you can include it here and CF will
   # restore that snapshot. If not, just leave this commented out and Docker will initialize the DB
   # DBSnapshot: 'ARN of my DBSnapshotIdentifier'
+  DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'
