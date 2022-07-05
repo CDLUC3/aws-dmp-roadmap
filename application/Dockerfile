@@ -10,10 +10,6 @@ RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
 
 # Install packages
 RUN apt-get clean
-# RUN apt-get update -qq && apt-get install -y build-essential libgmp3-dev libpq-dev vim git \
-#                                              apt-transport-https curl software-properties-common \
-#                                              imagemagick default-mysql-client gettext
-
 RUN apt-get -qqy update \
     && apt-get install -y vim \
                           build-essential \
@@ -39,16 +35,16 @@ RUN apt-get -qqy update \
 		                      nodejs -qqy \
     && rm -rf /var/lib/apt/lists/*
 
-# Add the nodejs repository to apt-get
-# RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
-# RUN apt-get install -y nodejs
-# RUN apt-get update
-
 # Env variables for application
 ENV DB_ADAPTER=mysql2
+ENV NODE_ENV=production
+
+RUN mkdir /roadmap
 
 # Adding project files
-COPY roadmap .
+COPY roadmap /roadmap
+
+WORKDIR /roadmap
 
 # Ensure its using the timezone we want
 ENV TZ=America/Los_Angeles
@@ -68,7 +64,8 @@ RUN bundle install --jobs 20 --retry 5
 
 # Install and run Yarn
 # RUN npm install -g yarn
-RUN yarn
+RUN rm -rf node_modules
+RUN yarn --frozen-lockfile --production
 # RUN yarn install
 
 # Copy the custom config files for Docker
