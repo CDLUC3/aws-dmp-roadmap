@@ -2,16 +2,47 @@ FROM ruby:2.7
 
 RUN echo $(apt-cache search magick)
 
+# Add NodeJS and Yarn repositories to apt-get
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+# Installing Node 16.x
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
+
 # Install packages
 RUN apt-get clean
-RUN apt-get update -qq && apt-get install -y build-essential libgmp3-dev libpq-dev vim git \
-                                             apt-transport-https curl software-properties-common \
-                                             imagemagick default-mysql-client
+# RUN apt-get update -qq && apt-get install -y build-essential libgmp3-dev libpq-dev vim git \
+#                                              apt-transport-https curl software-properties-common \
+#                                              imagemagick default-mysql-client gettext
+
+RUN apt-get -qqy update \
+    && apt-get install -y vim \
+                          build-essential \
+                          git \
+                          curl \
+                          locales \
+                          libreadline-dev \
+                          libssl-dev \
+                          libsqlite3-dev \
+                          wget \
+                          imagemagick \
+                          xz-utils \
+                          libcurl4-gnutls-dev \
+                          libxrender1 \
+                          libfontconfig1 \
+                          apt-transport-https \
+                          tzdata \
+                          xfonts-base \
+                          xfonts-75dpi \
+                          yarn \
+		                      python \
+                          shared-mime-info \
+		                      nodejs -qqy \
+    && rm -rf /var/lib/apt/lists/*
 
 # Add the nodejs repository to apt-get
-RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
-RUN apt-get install -y nodejs
-RUN apt-get update
+# RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
+# RUN apt-get install -y nodejs
+# RUN apt-get update
 
 # Env variables for application
 ENV DB_ADAPTER=mysql2
@@ -60,4 +91,3 @@ COPY --chown=755 overrides/docker-startup.rb ./docker-startup.rb
 EXPOSE 80 443 3306
 
 CMD ["ruby", "docker-startup.rb"]
-# CMD ["puma", "-C", "./config/application.rb", "-p", "80"]

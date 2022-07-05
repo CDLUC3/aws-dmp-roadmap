@@ -1,9 +1,20 @@
 # aws-dmp-roadmap
-AWS orchestration to run the DMPRoadmap open source codebase
+
+AWS orchestration to run the [DMPRoadmap](https://github.com/DMPRoadmap/roadmap) open source codebase.
+
+This repository includes the DMPRoadmap codebase as a gti submodule. After cloning this repository you will need to run `git submodule init` and then `git submodule update` to pull in the DMPRoadmap code.
+
+This repository contains a startup script and Dockerfile for the DMPRoadmap application. It includes the DMPRoadmap codebase as a git submodule. You can checkout any branch/tag of the codebase prior to building the Docker image.
+
+## Preparing the Docker image
+
+We use AWS Code Build and Code Pipeline which expect
 
 ## Creating the stack
 
-These Cloud Formation templates will build out the entire stack of AWS resources to host the [DMPRoadmap](https://github.com/DMPRoadmap/roadmap) open source codebase.
+These Cloud Formation templates will build out the entire stack of AWS resources to host the  open source codebase.
+
+To build the stack, perform the following
 
 ### Build out the DB and ECR repository
 

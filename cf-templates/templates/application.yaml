@@ -33,6 +33,8 @@ Parameters:
 
   ALBTargetGroupARN:
     Type: String
+  ALBDNSName:
+    Type: String
   ALBSecurityGroupID:
     Type: String
 
@@ -264,6 +266,8 @@ Resources:
             - Name: 'RAILS_LOG_TO_STDOUT'
               Value: true
 
+            - Name: 'ALB_DNS_NAME'
+              Value: !Ref ALBDNSName # DomainName
             - Name: 'DMPROADMAP_HOST'
               Value: !Ref DomainName
 
