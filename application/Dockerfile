@@ -67,8 +67,9 @@ RUN mkdir pid
 RUN bundle install --jobs 20 --retry 5
 
 # Install and run Yarn
-RUN npm install -g yarn
-RUN yarn install
+# RUN npm install -g yarn
+RUN yarn
+# RUN yarn install
 
 # Copy the custom config files for Docker
 COPY overrides/config/database.yml config/database.yml
