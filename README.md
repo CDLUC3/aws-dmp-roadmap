@@ -1,10 +1,14 @@
-# aws-dmp-roadmap
+# dmp-roadmap-cfn
 
 AWS orchestration to run the [DMPRoadmap](https://github.com/DMPRoadmap/roadmap) open source codebase.
 
-This repository includes the DMPRoadmap codebase as a gti submodule. After cloning this repository you will need to run `git submodule init` and then `git submodule update` to pull in the DMPRoadmap code.
+![DMPRoadmap AWS infrastructure](https://github.com/CDLUC3/dmp-roadmap-cfn/blob/main/dmproadmap.png?raw=true)
 
-This repository contains a startup script and Dockerfile for the DMPRoadmap application. It includes the DMPRoadmap codebase as a git submodule. You can checkout any branch/tag of the codebase prior to building the Docker image.
+This repository includes the DMPRoadmap codebase as a git submodule. After cloning this repository you will need to run `git submodule init` and then `git submodule update` to pull in the DMPRoadmap code.
+
+The `application/` directory contains the DMPRoadmap git submodule, the Dockerfile and various configuration files to build the Docker image.
+
+The `cf-templates/` directory contains the Sceptre Cloud Formation templates.
 
 ## Preparing the Docker image
 
