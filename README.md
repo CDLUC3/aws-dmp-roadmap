@@ -3,6 +3,7 @@
 AWS orchestration to run the [DMPRoadmap](https://github.com/DMPRoadmap/roadmap) open source codebase.
 
 ![DMPRoadmap AWS infrastructure](https://github.com/CDLUC3/dmp-roadmap-cfn/blob/main/dmproadmap.png?raw=true)
+__(see below for a glossary of acroyms referenced in the diagram)__
 
 ## Repository structure
 
@@ -77,3 +78,16 @@ You should create a snapshot of the RDS database before you delete the stack. On
 - The Docker image sends its logs to the `uc3-dmp-roadmap-dev-ecs` CloudWatch LogGroup. You can go to this log group in the AWS console to investigate application errors.
 
 - HTTP 502 and 503 errors indicate that ECS was either unable to deploy the application (or is in the process of doing so). Check the CloudWatch logs referenced above for more information.
+
+## Glossary
+- **ALB** Application Load Balancer
+- **CloudWatch** AWS logging service, we send logs here and it provides tooling for metrics, setting alarms, etc.
+- **ECR** Elastic Container Repository, an AWS version of DockerHub
+- **ECS** Elastic Container Service (we use Fargate), an AWS managed auto-scaling system that deploys and maintans instances of the application
+- **IAM** Identity and Access Management, roles that determine what a resource can do
+- **RDS** Relational Database Service, an AWS managed database like mySQL or Postgres
+- **Route53** AWS Domain Name System
+- **SecurityGroup** AWS Elastic Compute Cloud (EC2) security groups that manage which resources can talk to one another and over which protocols/ports
+- **SES** Simple Email Service
+- **SSM** Systems Manager, a key-value store used to supply the ECS containers with information (e.g. DB credentials)
+- **WAF** Web Application Firewall
