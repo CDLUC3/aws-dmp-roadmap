@@ -14,6 +14,18 @@ Your will need to run `git submodule init` and then `git submodule update` to pu
 
 The Cloud Formation templates will build out the entire stack of AWS resources to host the open source codebase. **Note that running these templates will create AWS resources that you will be billed for!**
 
+## Prerequisites
+
+The follow must be setup before you can build out the AWS infrastructure:
+- You must of couse have an AWS account
+- A VPC and Subnets already defined in AWS (update these values in the `config` files to match the ones you use)
+- A Route53 hosted zone (update this value in the `config` files to match your zone)
+- Define the following SSM parameters:
+  - /uc3/dmp/dev/hosted_zone_name  <-- used by the Route53 resources (e.g. example.edu)
+  - /uc3/dmp/roadmap/dev/db_dba_username  <-- used by the application to connect to RDS
+  - /uc3/dmp/roadmap/dev/db_dba_password  <-- used by the application to connect to RDS
+- If you have an existing RDS snapshot that you would like to use, you can specify the ARN of the snapshot in the `DBSnapshot` parameter in the `config` files. You can comment out this parameter in the files to have the Docker deploy process build a new DB and seed it for you from the `application/roadmap/db/seeds.rb` script.
+
 ## Build out the RDS database and ECR repository
 
 An Relational Database Service (RDS) database is required in order for the Fargate Elastic Container Service (ECS) cluster to deploy the application. Fargate also expects an initial Docker image to be present in the Elastic Container Repository (ECR).
@@ -55,6 +67,10 @@ Note: It can take several minutes for the ECS task to complete and for Fargate t
 - Login to the AWS console and go to CloudFormation.
 - Click on the `uc3-dmp-roadmap-dev-application` stack and go to the 'Outputs' tab
 - Visit the URL defined in the 'DomainName' attribute
+
+## Before you delete the AWS cloud formation stack
+
+You should create a snapshot of the RDS database before you delete the stack. Once the snapshot has been created, you should replace the `DBSnapshot` entries in the `config` files with the ARN of the new snapshot. This will ensure that tge next time you create the stack, the database will be restored.
 
 ## Troubleshooting
 
