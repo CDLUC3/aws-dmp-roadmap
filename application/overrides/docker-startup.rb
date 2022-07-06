@@ -11,19 +11,20 @@ def system!(*args)
   system(*args) || abort("\n== Command #{args} failed ==")
 end
 
-chdir APP_ROOT do
+chdir "#{APP_ROOT}/roadmap" do
+  prefix = "RAILS_ENV=#{ENV['RAILS_ENV']}"
+
   # This script is a starting point to setup your application.
   # Add necessary setup steps to this file.
   if ENV['DB_SNAPSHOT'] == 'none'
-    system! "bin/rails db:create RAILS_ENV=#{ENV['RAILS_ENV']}"
-    system! "bin/rails db:schema:load RAILS_ENV=#{ENV['RAILS_ENV']}"
-    system! "bin/rails db:seed RAILS_ENV=#{ENV['RAILS_ENV']}"
+    system! "#{prefix} bin/rails db:create"
+    system! "#{prefix} bin/rails db:schema:load"
+    system! "#{prefix} bin/rails db:seed"
   end
 
-  system! "bin/rails db:migrate RAILS_ENV=#{ENV['RAILS_ENV']}"
+  system! "#{prefix} bin/rails db:migrate"
 
-  # system! "bin/rails assets:clobber RAILS_ENV=#{ENV['RAILS_ENV']}"
-  # system! "bin/rails assets:precompile RAILS_ENV=#{ENV['RAILS_ENV']}"
+  system! "#{prefix} bin/rails assets:precompile"
 
-  system! "bin/puma -C config/puma.rb -p 80"
+  system! "#{prefix} bin/puma -C config/puma.rb -p 80"
 end

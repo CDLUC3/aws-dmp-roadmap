@@ -38,6 +38,7 @@ RUN apt-get -qqy update \
 # Env variables for application
 ENV DB_ADAPTER=mysql2
 ENV NODE_ENV=production
+ENV RAILS_SERVE_STATIC_FILES=false
 
 RUN mkdir /roadmap
 
