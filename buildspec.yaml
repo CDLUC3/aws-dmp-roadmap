@@ -25,7 +25,7 @@ phases:
       - echo $(cd $CFN_DIR && ls -la)
       - echo "dmproadmap code dir -- ${CODE_DIR}"
       - echo $(cd $CODE_DIR && ls -la)
-      - echo "COMMIT - ${DMPRoadmap.CommitId}"
+      - echo "GIT COMMIT - $(git log -n 1 --pretty=format:%H)"
 
       # Build a symlink to the code directory
       - echo Adding symbolic link to the DMPRoadmap codebase to the CFN Docker dir
