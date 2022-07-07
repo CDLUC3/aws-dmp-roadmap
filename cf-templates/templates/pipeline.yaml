@@ -27,6 +27,11 @@ Parameters:
   ECSServiceName:
     Type: String
 
+  ECRRepositoryURI:
+    Type: String
+  ECRRepositoryName:
+    Type: String
+
   RailsEnv:
     Type: String
   RailsLogLevel:
@@ -199,6 +204,11 @@ Resources:
             Value: !Ref ALBDNSName
           - Name: DMPROADMAP_HOST
             Value: !Ref DomainName
+
+          - Name: ECR_REPOSITORY_URI
+            Value: !Ref ECRRepositoryURI
+          - Name: ECR_REPOSITORY_NAME
+            Value: !Ref ECRRepositoryName
 
           - Name: DB_SNAPSHOT
             Value: !Ref DBSnapshot
