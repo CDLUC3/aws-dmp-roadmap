@@ -23,8 +23,7 @@ parameters:
 
   # If you have an existing RDS snapshot of your DB, you can include it here and CF will
   # restore that snapshot. If not, just leave this commented out and Docker will initialize the DB
-  # DBSnapshot: 'ARN of my DBSnapshotIdentifier'
-  DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'
+  # DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'
 
   DBInstanceType: 'db.t3.micro'
   # Valid options are based on the DB engine.

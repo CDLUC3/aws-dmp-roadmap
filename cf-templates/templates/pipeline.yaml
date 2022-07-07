@@ -58,7 +58,7 @@ Resources:
   # Cloudwatch LogGroup for the Codepipeline
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
   # -----------------------------------------------------------
-  PipelineLogGroup:
+  LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 30
@@ -99,17 +99,24 @@ Resources:
                   "Effect": "Allow",
                   "Action": ["codestar-connections:UseConnection"],
                   "Resource": "${CodeStarConnectionArn}"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["codestar-connections:UseConnection"],
+                  "Resource": "${CodeStarConnectionCfnArn}"
                 }
               ]
             }
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AWSCodePipelineFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess'
 
   IAMCodeBuildRole:
     Type: 'AWS::IAM::Role'
     DependsOn:
       - S3Bucket
-      - PipelineLogGroup
+      - LogGroup
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -119,6 +126,8 @@ Resources:
               Service: 'codebuild.amazonaws.com'
             Action:
               - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
       Policies:
         - PolicyName: !Sub '${AppName}-build-policy'
           PolicyDocument: !Sub >
@@ -132,7 +141,7 @@ Resources:
                     "logs:CreateLogStream",
                     "logs:PutLogEvents"
                   ],
-                  "Resource": "${PipelineLogGroup.Arn}"
+                  "Resource": "${LogGroup.Arn}"
                 },
                 {
                   "Effect": "Allow",
@@ -148,20 +157,74 @@ Resources:
                     "ec2:CreateNetworkInterfacePermission"
                   ],
                   "Resource": "*"
-                },
-                {
-                  "Effect": "Allow",
-                  "Action": [
-                    "s3:PutObject",
-                    "s3:GetObject",
-                    "s3:GetObjectVersion",
-                    "s3:GetBucketAcl",
-                    "s3:GetBucketLocation"
-                  ],
-                  "Resource": "${S3Bucket.Arn}"
                 }
               ]
             }
+
+  # -----------------------------------------------------------
+  # CodeBuild
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_CodeBuild.html
+  # -----------------------------------------------------------
+  CodeBuildSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub '${AppName}-build-sec'
+      GroupDescription: !Sub '${AppName} CodeBuild SecurityGroup'
+      VpcId: !Ref VpcID
+
+  CodeBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      ServiceRole: !GetAtt IAMCodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref LogGroup
+          Status: 'ENABLED'
+          StreamName: 'codebuild'
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/ubuntu-base:14.04
+        EnvironmentVariables:
+          - Name: 'RAILS_ENV'
+            Value: !Ref RailsEnv
+          - Name: 'RAILS_LOG_LEVEL'
+            Value: !Ref RailsLogLevel
+          - Name: RAILS_LOG_TO_STDOUT
+            Value: true
+
+          - Name: ALB_DNS_NAME
+            Value: !Ref ALBDNSName
+          - Name: DMPROADMAP_HOST
+            Value: !Ref DomainName
+
+          - Name: DB_SNAPSHOT
+            Value: !Ref DBSnapshot
+          - Name: DB_HOST
+            Value: !Ref DBAddress
+          - Name: DB_PORT
+            Value: !Ref DBPort
+          - Name: DB_NAME
+            Value: !Ref DBName
+          - Name: DB_USERNAME
+            Value: !Ref DBUsername
+          - Name: DB_PASSWORD
+            Value: !Ref DBPassword
+          - Name: DRAGONFLY_AWS
+            Value: false
+      Source:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 10
+      VpcConfig:
+        VpcId: !Ref VpcID
+        Subnets: !Ref Subnets
+        SecurityGroupIds:
+          - !Ref CodeBuildSecurityGroup
+      Cache:
+        Type: S3
+        Location: !Sub '${S3Bucket}/build-cache'
 
   # -----------------------------------------------------------
   # CodePipeline
@@ -196,9 +259,9 @@ Resources:
                 ConnectionArn: !Ref CodeStarConnectionArn
                 FullRepositoryId: 'DMPRoadmap/roadmap'
                 BranchName: 'development'
-                OutputArtifactFormat: 'CODEBUILD_CLONE_REF'
+                OutputArtifactFormat: 'CODE_ZIP'
               OutputArtifacts:
-                - Name: !Sub '${AppName}-commit'
+                - Name: !Sub 'dmproadmap_commit'
 
             # This action is triggered when the DMPRoadmap docker/CF codebase main branch receives
             # a new commit. Its output is a zip archive of the commit
@@ -217,7 +280,7 @@ Resources:
                 BranchName: 'main'
                 OutputArtifactFormat: 'CODE_ZIP'
               OutputArtifacts:
-                - Name: !Sub '${AppName}-docker'
+                - Name: !Sub 'dmproadmap_docker'
 
         - Name: 'DockerBuildPublish'
           Actions:
@@ -233,26 +296,13 @@ Resources:
                 Version: '1'
               # RoleArn: !GetAtt IAMCodeBuildRole.Arn
               Configuration:
-                ProjectName: !Sub '${AppName}-proj'
-                PrimarySource: !Sub '${AppName}-docker'
-                # EnvironmentVariables have a hard limit of 1000 characters in total :(
-                EnvironmentVariables: !Sub >
-                  [
-                    { "name": "RAILS_LOG_LEVEL", "type": "PLAINTEXT", "value": "${RailsLogLevel}" },
-                    { "name": "ALB_DNS_NAME", "type": "PLAINTEXT", "value": "${ALBDNSName}" },
-                    { "name": "DMPROADMAP_HOST", "type": "PLAINTEXT", "value": "${DomainName}" },
-                    { "name": "DB_SNAPSHOT", "type": "PLAINTEXT", "value": "${DBSnapshot}" },
-                    { "name": "DB_HOST", "type": "PLAINTEXT", "value": "${DBAddress}" },
-                    { "name": "DB_PORT", "type": "PLAINTEXT", "value": "${DBPort}" },
-                    { "name": "DB_NAME", "type": "PLAINTEXT", "value": "${DBName}" },
-                    { "name": "DB_USERNAME", "type": "PLAINTEXT", "value": "${DBUsername}" },
-                    { "name": "DB_PASSWORD", "type": "PLAINTEXT", "value": "${DBPassword}" }
-                  ]
+                ProjectName: !Ref CodeBuildProject
+                PrimarySource: !Sub 'dmproadmap_docker'
               InputArtifacts:
-                - Name: !Sub '${AppName}-commit'
-                - Name: !Sub '${AppName}-docker'
+                - Name: !Sub 'dmproadmap_commit'
+                - Name: !Sub 'dmproadmap_docker'
               OutputArtifacts:
-                - Name: !Sub '${AppName}-image'
+                - Name: !Sub 'dmproadmap_image'
 
         - Name: 'FargateDeploy'
           Actions:
@@ -267,13 +317,13 @@ Resources:
                 ClusterName: !Ref ECSClusterName
                 ServiceName: !Ref ECSServiceName
               InputArtifacts:
-                - Name: !Sub '${AppName}-image'
+                - Name: !Sub 'dmproadmap_image'
 
 Outputs:
   LogGroupId:
-    Value: !Ref PipelineLogGroup
+    Value: !Ref LogGroup
   LogGroupArn:
-    Value: !GetAtt PipelineLogGroup.Arn
+    Value: !GetAtt LogGroup.Arn
 
   PipelineRoleId:
     Value: !Ref IAMPipelineRole
@@ -291,6 +341,11 @@ Outputs:
     Value: !Sub "s3://${S3Bucket}"
   S3BucketArn:
     Value: !GetAtt S3Bucket.Arn
+
+  CodeBuildProjectName:
+    Value: !Ref CodeBuildProject
+  CodeBuildProjectArn:
+    Value: !GetAtt CodeBuildProject.Arn
 
   PipelineId:
     Value: !Ref Pipeline

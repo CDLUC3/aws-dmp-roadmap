@@ -11,7 +11,7 @@ phases:
   pre_build:
     commands:
       - CFN_DIR=${CODEBUILD_SRC_DIR}
-      - DMPROADMAP_COMMIT_DIR=${CODEBUILD_SRC_DIR_DMPRoadmapPush}
+      - CODE_DIR=${CODEBUILD_SRC_DIR_DMPRoadmapPush}
 
       # Set some ENV variables here because CF only allows a limit of 1000 characters in the
       # EnvironmentVariable config for the Pipeline action :(
@@ -19,21 +19,24 @@ phases:
       - export RAILS_LOG_TO_STDOUT=true
       - export DRAGONFLY_AWS=false
 
-      - echo "dmp-roadmap-cfn directory -> $CFN_DIR"
-      - echo "dmproadmap git commit -> ${DMPROADMAP_COMMIT_DIR}"
-      - echo $(cd $DMPROADMAP_COMMIT_DIR && ls -la)
-      - echo $DMPRoadmap.CommitId
+      - echo "PWD -- $(pwd)"
+      - echo $(ls -la)
+      - echo "dmp-roadmap-cfn directory -- $CFN_DIR"
+      - echo $(cd $CFN_DIR && ls -la)
+      - echo "dmproadmap code dir -- ${CODE_DIR}"
+      - echo $(cd $CODE_DIR && ls -la)
+      - echo "COMMIT - ${DMPRoadmap.CommitId}"
 
-      # Pull in the DMPRoadmap git submodule
-      - echo Fetching DMPRoadmap commit
-      - cd ${CFN_DIR}/application/
-      - git submodule init && git submodule pull
-      - cd roadmap
-      - git fetch origin ${CODEBUILD_RESOLVED_SOURCE_VERSION} && git checkout ${commit}`
+      # Build a symlink to the code directory
+      - echo Adding symbolic link to the DMPRoadmap codebase to the CFN Docker dir
+      - echo "PWD -- $(pwd)"
+      - cd $CFN_DIR
+      - if ! [ -L ./roadmap ]; then rm ./roadmap; fi
+      - ln -s $CODE_DIR ./roadmap
 
       # Fetch the ECR repository name
       - echo Fetching ECR URI
-      - aws --version
+      - echo "PWD -- $(pwd)"
       - aws ecr describe-repositories | grep '\.amazonaws\.com/uc3-dmp-roadmap-dev-ecr' >> .ecr
       - awk '{gsub("\"repositoryUri\": \"","");print}' .ecr >> .repo
       - FULL_ECR_URI=$(awk '{gsub("\",", "");print}' .repo)
@@ -43,7 +46,7 @@ phases:
 
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
       - echo Logging in to Amazon ECR...
-      - aws --version
+      - echo "PWD -- $(pwd)"
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -51,12 +54,16 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
+      - echo "PWD -- $(pwd)"
+      - cd $CFN_DIR
       - docker build -t $FULL_ECR_URI:latest .
       - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker images...
+      - echo "PWD -- $(pwd)"
+      - cd $CFN_DIR
       - docker push $FULL_ECR_URI:latest
       - docker push $FULL_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
