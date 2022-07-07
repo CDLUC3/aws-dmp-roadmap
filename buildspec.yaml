@@ -1,0 +1,66 @@
+# Build specifications for AWS CodeBuild
+
+# Each input artifact is extracted to its own directory by CodePipeline, the locations of which
+# are stored in environment variables. The directory for the primary source artifact (this repo)
+# is made available with $CODEBUILD_SRC_DIR. The directory for the DMPRoadmap push artifacts is
+# made available with $CODEBUILD_SRC_DIR_uc3-dmp-roadmap-commit.
+
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - CFN_DIR=${CODEBUILD_SRC_DIR}
+      - DMPROADMAP_COMMIT_DIR=${CODEBUILD_SRC_DIR_DMPRoadmapPush}
+
+      # Set some ENV variables here because CF only allows a limit of 1000 characters in the
+      # EnvironmentVariable config for the Pipeline action :(
+      - export RAILS_ENV=ci
+      - export RAILS_LOG_TO_STDOUT=true
+      - export DRAGONFLY_AWS=false
+
+      - echo "dmp-roadmap-cfn directory -> $CFN_DIR"
+      - echo "dmproadmap git commit -> ${DMPROADMAP_COMMIT_DIR}"
+      - echo $(cd $DMPROADMAP_COMMIT_DIR && ls -la)
+      - echo $DMPRoadmap.CommitId
+
+      # Pull in the DMPRoadmap git submodule
+      - echo Fetching DMPRoadmap commit
+      - cd ${CFN_DIR}/application/
+      - git submodule init && git submodule pull
+      - cd roadmap
+      - git fetch origin ${CODEBUILD_RESOLVED_SOURCE_VERSION} && git checkout ${commit}`
+
+      # Fetch the ECR repository name
+      - echo Fetching ECR URI
+      - aws --version
+      - aws ecr describe-repositories | grep '\.amazonaws\.com/uc3-dmp-roadmap-dev-ecr' >> .ecr
+      - awk '{gsub("\"repositoryUri\": \"","");print}' .ecr >> .repo
+      - FULL_ECR_URI=$(awk '{gsub("\",", "");print}' .repo)
+      - SHORT_ECR_URI=$(awk '{gsub("/uc3-dmp-roadmap-dev-ecr\",", "");print}' .repo)
+      - rm .ecr && rm .repo
+      - echo ECR repo - $FULL_ECR_URI
+
+      # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $FULL_ECR_URI:latest .
+      - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $FULL_ECR_URI:latest
+      - docker push $FULL_ECR_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $FULL_ECR_URI:$IMAGE_TAG > imagedefinitions.json
+      - cat imagedefinitions.json
+artifacts:
+    files: imagedefinitions.json

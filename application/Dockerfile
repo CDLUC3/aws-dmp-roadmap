@@ -86,7 +86,10 @@ RUN export WICKED_PDF_PATH=`which wkhtmltopdf`
 # Copy the startup script into the container
 COPY --chown=755 overrides/docker-startup.rb ./docker-startup.rb
 
-# expose correct port
-EXPOSE 80 443 3306
+# expose correct ports
+#   25 - email server
+#   80 and 443 - HTTP traffic
+#   3306 - database server
+EXPOSE 25 80 443 3306
 
 CMD ["ruby", "docker-startup.rb"]

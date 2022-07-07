@@ -102,7 +102,7 @@ Resources:
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonRDSDataFullAccess'
-        # - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonSESFullAccess'
         - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
   # -----------------------------------------------------------
@@ -128,48 +128,6 @@ Resources:
       GroupId: !GetAtt ECSSecurityGroup.GroupId
       SourceSecurityGroupId: !Ref ALBSecurityGroupID
 
-  # Allow the ECS instance(s) to call the RDS instance(s)
-  # ECSSecurityGroupEgressToRDS:
-  #   Type: AWS::EC2::SecurityGroupEgress
-  #   Properties:
-  #     IpProtocol: 'tcp'
-  #     FromPort: 3306
-  #     ToPort: 3306
-  #     GroupId: !GetAtt ECSSecurityGroup.GroupId
-  #     DestinationSecurityGroupId: !Ref DBSecurityGroupID
-
-  # Allow the ECS instance(s) to respond to the ALB
-  # ECSSecurityGroupEgressToALB:
-  #   Type: AWS::EC2::SecurityGroupEgress
-  #   Properties:
-  #     IpProtocol: 'tcp'
-  #     FromPort: 80
-  #     ToPort: 80
-  #     GroupId: !GetAtt ECSSecurityGroup.GroupId
-  #     DestinationSecurityGroupId: !Ref ALBSecurityGroupID
-
-  # Allow the S3 bucket to accept traffic from the ECS instance(s)
-  # S3SecurityGroupIngressFromECS:
-  #   Type: AWS::EC2::SecurityGroupIngress
-  #   DependsOn:
-  #     - ECSSecurityGroup
-  #   Properties:
-  #     IpProtocol: 'tcp'
-  #     FromPort: 80
-  #     ToPort: 80
-  #     GroupId: !Ref S3SecurityGroupID
-  #     SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
-
-  # Allow the RDS instance to respond to the ECS instance(s)
-  # S3SecurityGroupEgressToECS:
-  #   Type: AWS::EC2::SecurityGroupEgress
-  #   Properties:
-  #     IpProtocol: 'tcp'
-  #     FromPort: 80
-  #     ToPort: 80
-  #     GroupId: !Ref S3SecurityGroupID
-  #     DestinationSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
-
   # Allow the RDS instance(s) to receive traffic from the ECS instance(s)
   DBSecurityGroupIngressFromECS:
     Type: AWS::EC2::SecurityGroupIngress
@@ -181,16 +139,6 @@ Resources:
       ToPort: 3306
       GroupId: !Ref DBSecurityGroupID
       SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
-
-  # Allow the RDS instance to respond to the ECS instance(s)
-  # DBSecurityGroupEgressToECS:
-  #   Type: AWS::EC2::SecurityGroupEgress
-  #   Properties:
-  #     IpProtocol: 'tcp'
-  #     FromPort: 3306
-  #     ToPort: 3306
-  #     GroupId: !Ref DBSecurityGroupID
-  #     DestinationSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
 
   # -----------------------------------------------------------
   # Elastic Container Service (ECS) - Containers that host the application
@@ -246,8 +194,13 @@ Resources:
               awslogs-group: !Sub '${AppName}-${Environment}-ecs'
               awslogs-stream-prefix: !Sub '${Environment}-ecs'
           PortMappings:
+            # SES port
+            - ContainerPort: 25
+              Protocol: 'tcp'
+            # ALB port
             - ContainerPort: 80
               Protocol: 'tcp'
+            # RDS port
             - ContainerPort: 3306
               Protocol: 'tcp'
           # TODO: See if there is a way for Rails to use these. Passing in Env is not recommended

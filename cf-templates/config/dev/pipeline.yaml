@@ -3,5 +3,28 @@ template:
   type: 'file'
 
 parameters:
+  VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
+  Subnets:
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
+
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
+  DomainName: !stack_output dev/frontend.yaml::DomainName
+
+  CodeStarConnectionArn: !ssm_parameter /uc3/dmp/roadmap/dev/codestar_connection
+  CodeStarConnectionCfnArn: !ssm_parameter /uc3/dmp/roadmap/dev/codestar_connection_cfn
+
+  ECSClusterName: !stack_output dev/application.yaml::ECSFargateClusterId
+  ECSServiceName: !stack_output dev/application.yaml::ECSServiceName
+
+  RailsEnv: !stack_attr sceptre_user_data.rails_env
+  RailsLogLevel: !stack_attr sceptre_user_data.rails_log_level
+  ALBDNSName: !stack_output dev/frontend.yaml::ALBDNSName
+  DBAddress: !stack_output dev/data.yaml::DBAddress
+  DBPort: !stack_output dev/data.yaml::DBPort
+  DBName: !stack_output dev/data.yaml::DBName
+  DBUsername: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_username
+  DBPassword: !ssm_parameter /uc3/dmp/roadmap/dev/db_dba_password
+  DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'

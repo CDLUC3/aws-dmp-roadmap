@@ -4,30 +4,295 @@ Transform: AWS::Serverless-2016-10-31
 Description: 'Code build and pipeline for the DMPRoadmap system'
 
 Parameters:
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+  Subnets:
+    Type: 'List<AWS::EC2::Subnet::Id>'
+
   AppName:
     Type: String
   Environment:
     Type: String
     Default: 'dev'
+  DomainName:
+    Type: String
+
+  CodeStarConnectionArn:
+    Type: String
+  CodeStarConnectionCfnArn:
+    Type: String
+
+  ECSClusterName:
+    Type: String
+  ECSServiceName:
+    Type: String
+
+  RailsEnv:
+    Type: String
+  RailsLogLevel:
+    Type: String
+    Default: 'warn'
+    AllowedValues:
+      - 'debug'
+      - 'warn'
+      - 'error'
+  ALBDNSName:
+    Type: String
+
+  DBSnapshot:
+    Type: String
+    Default: 'none'
+  DBAddress:
+    Type: String
+  DBPort:
+    Type: String
+  DBName:
+    Type: String
+  DBUsername:
+    Type: String
+  DBPassword:
+    Type: String
 
 Resources:
+  # -----------------------------------------------------------
+  # Cloudwatch LogGroup for the Codepipeline
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-logs-loggroup.html
+  # -----------------------------------------------------------
+  PipelineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  # -----------------------------------------------------------
+  # S3 Bucket for the pipeline artifacts
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+  # -----------------------------------------------------------
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
 
   # -----------------------------------------------------------
   # Identitity and Access Management (IAM)
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
   # -----------------------------------------------------------
+  IAMPipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - 'codepipeline.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${AppName}-pipline-policy'
+          PolicyDocument: !Sub >
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["codestar-connections:UseConnection"],
+                  "Resource": "${CodeStarConnectionArn}"
+                }
+              ]
+            }
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCodePipelineFullAccess'
 
-# arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
-
-  # -----------------------------------------------------------
-  # CodeBuild
-  #   See:
-  # -----------------------------------------------------------
+  IAMCodeBuildRole:
+    Type: 'AWS::IAM::Role'
+    DependsOn:
+      - S3Bucket
+      - PipelineLogGroup
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'codebuild.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub '${AppName}-build-policy'
+          PolicyDocument: !Sub >
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "${PipelineLogGroup.Arn}"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:*",
+                    "ec2:CreateNetworkInterface",
+                    "ec2:DescribeNetworkInterfaces",
+                    "ec2:DeleteNetworkInterface",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeDhcpOptions",
+                    "ec2:DescribeVpcs",
+                    "ec2:CreateNetworkInterfacePermission"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:GetBucketAcl",
+                    "s3:GetBucketLocation"
+                  ],
+                  "Resource": "${S3Bucket.Arn}"
+                }
+              ]
+            }
 
   # -----------------------------------------------------------
   # CodePipeline
-  #   See:
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-codepipeline-pipeline.html
   # -----------------------------------------------------------
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    DependsOn:
+      - IAMPipelineRole
+    Properties:
+      ArtifactStore:
+        Location: !Ref S3Bucket
+        # CloudFormation only supports S3 at the moment!
+        Type: 'S3'
+      RestartExecutionOnUpdate: true
+      RoleArn: !GetAtt IAMPipelineRole.Arn
+      Stages:
+        - Name: 'MonitorRepos'
+          Actions:
+            # This action is triggered when the development branch of DMPRoadmap has a new commit
+            # it's output is the commit hash
+            - Name: 'DMPRoadmap'
+              RunOrder: 1
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Provider: 'CodeStarSourceConnection'
+                Version: '1'
+              # See: https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-CodestarConnectionSource.html
+              # for info on tying CodeBuild in
+              Configuration:
+                ConnectionArn: !Ref CodeStarConnectionArn
+                FullRepositoryId: 'DMPRoadmap/roadmap'
+                BranchName: 'development'
+                OutputArtifactFormat: 'CODEBUILD_CLONE_REF'
+              OutputArtifacts:
+                - Name: !Sub '${AppName}-commit'
+
+            # This action is triggered when the DMPRoadmap docker/CF codebase main branch receives
+            # a new commit. Its output is a zip archive of the commit
+            - Name: 'DmpRoadmapCfn'
+              RunOrder: 1
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Provider: 'CodeStarSourceConnection'
+                Version: '1'
+              # See: https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-CodestarConnectionSource.html
+              # for info on tying CodeBuild in
+              Configuration:
+                ConnectionArn: !Ref CodeStarConnectionCfnArn
+                FullRepositoryId: 'CDLUC3/dmp-roadmap-cfn'
+                BranchName: 'main'
+                OutputArtifactFormat: 'CODE_ZIP'
+              OutputArtifacts:
+                - Name: !Sub '${AppName}-docker'
+
+        - Name: 'DockerBuildPublish'
+          Actions:
+            # This action is triggered by either the DMPRoadmapPush or DockerPush actions. This
+            # action uses the DMPRoadmapPush commit hash to the latest DockerPush zip to build
+            # the Docker image
+            - Name: 'Build'
+              RunOrder: 2
+              ActionTypeId:
+                Category: 'Build'
+                Owner: 'AWS'
+                Provider: 'CodeBuild'
+                Version: '1'
+              # RoleArn: !GetAtt IAMCodeBuildRole.Arn
+              Configuration:
+                ProjectName: !Sub '${AppName}-proj'
+                PrimarySource: !Sub '${AppName}-docker'
+                # EnvironmentVariables have a hard limit of 1000 characters in total :(
+                EnvironmentVariables: !Sub >
+                  [
+                    { "name": "RAILS_LOG_LEVEL", "type": "PLAINTEXT", "value": "${RailsLogLevel}" },
+                    { "name": "ALB_DNS_NAME", "type": "PLAINTEXT", "value": "${ALBDNSName}" },
+                    { "name": "DMPROADMAP_HOST", "type": "PLAINTEXT", "value": "${DomainName}" },
+                    { "name": "DB_SNAPSHOT", "type": "PLAINTEXT", "value": "${DBSnapshot}" },
+                    { "name": "DB_HOST", "type": "PLAINTEXT", "value": "${DBAddress}" },
+                    { "name": "DB_PORT", "type": "PLAINTEXT", "value": "${DBPort}" },
+                    { "name": "DB_NAME", "type": "PLAINTEXT", "value": "${DBName}" },
+                    { "name": "DB_USERNAME", "type": "PLAINTEXT", "value": "${DBUsername}" },
+                    { "name": "DB_PASSWORD", "type": "PLAINTEXT", "value": "${DBPassword}" }
+                  ]
+              InputArtifacts:
+                - Name: !Sub '${AppName}-commit'
+                - Name: !Sub '${AppName}-docker'
+              OutputArtifacts:
+                - Name: !Sub '${AppName}-image'
+
+        - Name: 'FargateDeploy'
+          Actions:
+            - Name: 'Deploy'
+              RunOrder: 3
+              ActionTypeId:
+                Category: 'Deploy'
+                Owner: 'AWS'
+                Provider: 'ECS'
+                Version: '1'
+              Configuration:
+                ClusterName: !Ref ECSClusterName
+                ServiceName: !Ref ECSServiceName
+              InputArtifacts:
+                - Name: !Sub '${AppName}-image'
 
 Outputs:
+  LogGroupId:
+    Value: !Ref PipelineLogGroup
+  LogGroupArn:
+    Value: !GetAtt PipelineLogGroup.Arn
 
+  PipelineRoleId:
+    Value: !Ref IAMPipelineRole
+  PipelineRoleArn:
+    Value: !GetAtt IAMPipelineRole.Arn
+
+  CodeBuildRoleId:
+    Value: !Ref IAMCodeBuildRole
+  CodeBuildRoleArn:
+    Value: !GetAtt IAMCodeBuildRole.Arn
+
+  S3BucketId:
+    Value: !Ref S3Bucket
+  S3BucketUri:
+    Value: !Sub "s3://${S3Bucket}"
+  S3BucketArn:
+    Value: !GetAtt S3Bucket.Arn
+
+  PipelineId:
+    Value: !Ref Pipeline
+  PipelineVersion:
+    Value: !GetAtt Pipeline.Version

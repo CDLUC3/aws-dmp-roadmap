@@ -79,6 +79,16 @@ You should create a snapshot of the RDS database before you delete the stack. On
 
 - HTTP 502 and 503 errors indicate that ECS was either unable to deploy the application (or is in the process of doing so). Check the CloudWatch logs referenced above for more information.
 
+## Setting up CI/CD
+
+- Log into the AWS Console and go to the CodePipeline page.
+- Select 'Connections' under 'Settings' on the left menu.
+- Click the 'Create' button and fill out the form
+- Sign in to GitHub (or Bitbucket if applicable)
+- On the next AWS form, click the 'create a new app' button and then select the GitHub organization and repository(ies)
+- Add any additional tags and then click 'Connect'
+- Copy the ARN of your new CodeStar Connection and add it to the SSM Parameter Store as a SecureString named '/uc3/dmp/roadmap/dev/codestar_connection'
+
 ## Glossary
 - **ALB** Application Load Balancer
 - **CloudWatch** AWS logging service, we send logs here and it provides tooling for metrics, setting alarms, etc.
