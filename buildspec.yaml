@@ -37,10 +37,13 @@ phases:
       # Fetch the ECR repository name
       - echo Fetching ECR URI
       - echo "PWD -- $(pwd)"
-      - echo $ECR_REPOSITORY_URI >> .ecr
-      - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
-      - rm .ecr
-      - echo ECR repo - $SHORT_ECR_URI
+      #- echo $ECR_REPOSITORY_URI >> .ecr
+      #- SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
+      #- rm .ecr
+      #- echo ECR repo - $SHORT_ECR_URI
+
+      ECR_REPOSITORY_URI=671846987296.dkr.ecr.us-west-2.amazonaws.com/uc3-dmp-roadmap-dev-ecr
+      SHORT_ECR_URI=671846987296.dkr.ecr.us-west-2.amazonaws.com
 
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
       - echo Logging in to Amazon ECR...
