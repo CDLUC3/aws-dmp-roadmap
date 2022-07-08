@@ -144,9 +144,21 @@ Resources:
                   "Action": [
                     "logs:CreateLogGroup",
                     "logs:CreateLogStream",
-                    "logs:PutLogEvents"
+                    "logs:PutLogEvents",
+                    "logs:AssociateKmsKey"
                   ],
-                  "Resource": "${LogGroup.Arn}"
+                  "Resource": [
+                    "${LogGroup.Arn}"
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:PutMetricData"
+                  ],
+                  "Resource": [
+                    "*"
+                  ]
                 },
                 {
                   "Effect": "Allow",
@@ -161,7 +173,9 @@ Resources:
                     "ec2:DescribeVpcs",
                     "ec2:CreateNetworkInterfacePermission"
                   ],
-                  "Resource": "*"
+                  "Resource": [
+                    "*"
+                  ]
                 }
               ]
             }
