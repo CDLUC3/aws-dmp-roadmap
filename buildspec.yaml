@@ -46,15 +46,14 @@ phases:
       #- rm .ecr
       #- echo ECR repo - $SHORT_ECR_URI
 
-      - ECR_REPOSITORY_URI=671846987296.dkr.ecr.us-west-2.amazonaws.com/uc3-dmp-roadmap-dev-ecr
       - SHORT_ECR_URI=671846987296.dkr.ecr.us-west-2.amazonaws.com
 
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
       - echo Logging in to Amazon ECR...
       - echo "PWD -- $(pwd)"
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      # - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
+      # - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      # - IMAGE_TAG=${COMMIT_HASH:=latest}
 
       - echo printenv
   build:
@@ -62,19 +61,19 @@ phases:
       - echo Build started on `date`
       - echo Building the Docker image...
       - echo "PWD -- $(pwd)"
-      - cd $CFN_DIR
-      - docker build -t $FULL_ECR_URI:latest .
-      - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
+      # - cd $CFN_DIR
+      # - docker build -t $FULL_ECR_URI:latest .
+      # - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker images...
       - echo "PWD -- $(pwd)"
-      - cd $CFN_DIR
-      - docker push $FULL_ECR_URI:latest
-      - docker push $FULL_ECR_URI:$IMAGE_TAG
+      # - cd $CFN_DIR
+      # - docker push $FULL_ECR_URI:latest
+      # - docker push $FULL_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
-      - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $FULL_ECR_URI:$IMAGE_TAG > imagedefinitions.json
+      - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - cat imagedefinitions.json
 artifacts:
     files: imagedefinitions.json
