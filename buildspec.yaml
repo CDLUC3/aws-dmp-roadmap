@@ -31,8 +31,10 @@ phases:
       # Build a symlink in the CDLUC3/dmp-roadmap-cfn directory to DMPRoadmap/roadmap for Docker
       - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
       - if [ -L ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap; fi
-      - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit ${CODEBUILD_SRC_DIR}/application/roadmap
-      - echo $(ls -la $CODEBUILD_SRC_DIR/application/roadmap/)
+      - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit ${CODEBUILD_SRC_DIR}/application/roadmap/
+      - export DOCKER_DIR=$CODEBUILD_SRC_DIR/application/roadmap/
+
+      - echo $(ls -la $DOCKER_DIR)
 
       # Fetch the ECR repository name
       - echo $ECR_REPOSITORY_URI >> .ecr
@@ -40,31 +42,27 @@ phases:
       - rm .ecr
 
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
-      - echo Logging in to Amazon ECR...
+      - echo Logging in to Amazon ECR ...
       - cd $CODEBUILD_SRC_DIR
-      - echo $SHORT_ECR_URI
       # CodeBuild is using cli v1 so need to use `get-login` instead of `get-login-password`
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
-      # - aws ecr get-login --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
-      - "IMAGE_TAG=dmproadmap:=latest"
+      - "IMAGE_TAG=${SHORT_ECR_URI}:=latest"
 
       - echo $(printenv)
   build:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - echo "PWD -- $(pwd)"
-      # - cd $CFN_DIR
-      # - docker build -t $FULL_ECR_URI:latest .
-      # - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
+      - cd $DOCKER_DIR
+      - docker build -t $FULL_ECR_URI:latest .
+      - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker images...
-      - echo "PWD -- $(pwd)"
-      # - cd $CFN_DIR
-      # - docker push $FULL_ECR_URI:latest
-      # - docker push $FULL_ECR_URI:$IMAGE_TAG
+      - cd $DOCKER_DIR
+      - docker push $FULL_ECR_URI:latest
+      - docker push $FULL_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
       - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - cat imagedefinitions.json
