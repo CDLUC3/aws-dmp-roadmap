@@ -19,7 +19,7 @@ phases:
       - export RAILS_ENV=ci
       - export RAILS_LOG_TO_STDOUT=true
       - export DRAGONFLY_AWS=false
-      - export AWS_VERSION=$(aws )
+      - export AWS_VERSION=$(aws --version)
 
       # This is CDLUC3/dmp-roadmap-cfn codebase directory
       - echo "CDLUC3/dmp-roadmap-cfn dir -- ${CODEBUILD_SRC_DIR}"
@@ -31,7 +31,7 @@ phases:
       # Build a symlink in the CDLUC3/dmp-roadmap-cfn directory to DMPRoadmap/roadmap for Docker
       - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
       - if [ -L ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap; fi
-      - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit ${CODEBUILD_SRC_DIR}/application/roadmap/
+      - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit/ ${CODEBUILD_SRC_DIR}/application/roadmap/
       - export DOCKER_DIR=$CODEBUILD_SRC_DIR/application/roadmap/
 
       - echo $(ls -la $DOCKER_DIR)
