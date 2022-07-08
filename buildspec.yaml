@@ -23,9 +23,11 @@ phases:
       - export RAILS_LOG_TO_STDOUT=true
       - export DRAGONFLY_AWS=false
 
-      - echo "PWD -- $(pwd)"
+      - echo "CODEBUILD_SRC_DIR -- ${CODEBUILD_SRC_DIR}"
       - echo $(ls -la)
-      - echo "dmproadmap code dir -- ${CODE_DIR}"
+      - echo "CODEBUILD_GOPATH -- ${CODEBUILD_GOPATH}"
+      - echo $(ls -la $CODEBUILD_GOPATH)
+
       # - echo $(cd $CODE_DIR && ls -la)
       - echo "GIT COMMIT - $(git log -n 1 --pretty=format:%H)"
 
