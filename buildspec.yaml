@@ -69,7 +69,7 @@ phases:
       - docker push $SHORT_ECR_URI:latest
       - docker push $SHORT_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
-      - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
-      - cat imagedefinitions.json
+      - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > dmproadmap_image.json
+      - cat dmproadmap_image.json
 artifacts:
-    files: imagedefinitions.json
+    files: dmproadmap_image.json

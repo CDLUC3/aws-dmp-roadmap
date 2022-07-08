@@ -249,7 +249,7 @@ Resources:
             Value: false
       Source:
         Type: CODEPIPELINE
-      TimeoutInMinutes: 10
+      TimeoutInMinutes: 15
       VpcConfig:
         VpcId: !Ref VpcID
         Subnets: !Ref Subnets
