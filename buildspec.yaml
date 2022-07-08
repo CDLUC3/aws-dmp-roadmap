@@ -31,7 +31,7 @@ phases:
       - echo Adding symbolic link to the DMPRoadmap codebase to the CFN Docker dir
       - echo "PWD -- $(pwd)"
       - cd $CFN_DIR
-      - if ! [ -L ./roadmap ]; then rm ./roadmap; fi
+      - if [ -L ./roadmap ]; then rm roadmap; fi
       - ln -s $CODE_DIR ./roadmap
 
       # Fetch the ECR repository name
@@ -49,8 +49,7 @@ phases:
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
 
-      - echo "COMMIT HASH - ${COMMIT_HASH}"
-      - echo "IMAGE TAG - ${IMAGE_TAG}"
+      - echo printenv
   build:
     commands:
       - echo Build started on `date`
