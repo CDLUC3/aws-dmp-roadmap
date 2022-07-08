@@ -34,14 +34,14 @@ phases:
       - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
       - if [ ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap/; fi
       - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit/ ${CODEBUILD_SRC_DIR}/application/roadmap
-      - export DOCKER_DIR=$CODEBUILD_SRC_DIR/application/roadmap/
+      - export DMPROADMAP_DIR=$CODEBUILD_SRC_DIR/application/roadmap/
 
       # Fetch the Git commit from the DMPRoadmap repo
-      - cd $DOCKER_DIR && export DMPROADMAP_COMMIT=$(git log --format="%H" -n 1 | cut -c 1-7)
+      - cd $DMPROADMAP_DIR && export DMPROADMAP_COMMIT=$(git log --format="%H" -n 1 | cut -c 1-7)
 
       # Add the Git commit to the footer of the DMPRoadmap application
-      - echo "Appending Git revision number ${DMPROADMAP_COMMIT} to DMPRoadmap footer ..."
-      - 'echo "<p>Revision: ${DMPROADMAP_COMMIT}</p>" >> $DOCKER_DIR/app/views/layouts/_footer.html.erb'
+      - echo Appending Git revision number $DMPROADMAP_COMMIT to DMPRoadmap footer ...
+      - 'echo "<p>Revision: ${DMPROADMAP_COMMIT}</p>" >> $DMPROADMAP_DIR/app/views/layouts/_footer.html.erb'
 
       # Fetch the ECR repository name
       - echo $ECR_REPOSITORY_URI >> .ecr
@@ -61,7 +61,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - cd $DOCKER_DIR
+      - cd $CODEBUILD_SRC_DIR
       # - docker build -t $ECR_REPOSITORY_NAME .
       # - "docker tag $ECR_REPOSITORY_NAME $FULL_ECR_URI:latest"
       - docker build -t $SHORT_ECR_URI:latest .
@@ -70,7 +70,7 @@ phases:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker images...
-      - cd $DOCKER_DIR
+      - cd $CODEBUILD_SRC_DIR
       - docker push $SHORT_ECR_URI:latest
       - docker push $SHORT_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
