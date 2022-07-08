@@ -8,9 +8,6 @@
 
 version: 0.2
 
-proxy:
-  logs: yes
-
 phases:
   pre_build:
     commands:

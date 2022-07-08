@@ -40,11 +40,9 @@ ENV DB_ADAPTER=mysql2
 ENV NODE_ENV=production
 ENV RAILS_SERVE_STATIC_FILES=false
 
-RUN mkdir /roadmap
-
 # Adding project files
-COPY roadmap /roadmap
-
+RUN mkdir /roadmap
+COPY roadmap/ /roadmap
 WORKDIR /roadmap
 
 # Ensure its using the timezone we want
