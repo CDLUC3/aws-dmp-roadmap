@@ -25,12 +25,10 @@ phases:
       # This is the DMPRoadmap/roadmap codebase directory
       - echo "DMPRoadmap/roadmap dir -- ${CODEBUILD_SRC_DIR_dmproadmap_commit}"
 
-      - echo $(ls -lah $CODEBUILD_SRC_DIR_dmproadmap_commit/)
-
-      # Build a symlink in the CDLUC3/dmp-roadmap-cfn directory to DMPRoadmap/roadmap for Docker
+      # Copying the DMPRoadmap/roadmap into the CDLUC3/dmp-roadmap-cfn directory for Docker
       - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
       - if [ ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap/; fi
-      - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit/ ${CODEBUILD_SRC_DIR}/application/roadmap
+      - cp -a $CODEBUILD_SRC_DIR_dmproadmap_commit/ ${CODEBUILD_SRC_DIR}/application/roadmap
       - export DMPROADMAP_DIR=$CODEBUILD_SRC_DIR/application/roadmap/
 
       # Fetch the Git commit from the DMPRoadmap repo
