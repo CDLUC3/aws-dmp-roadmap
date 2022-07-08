@@ -20,38 +20,29 @@ phases:
       - export RAILS_LOG_TO_STDOUT=true
       - export DRAGONFLY_AWS=false
 
-      - echo "CODEBUILD_SRC_DIR -- ${CODEBUILD_SRC_DIR}"
-      - echo $(ls -la)
-      - echo "CODEBUILD_SRC_DIR_dmproadmap_commit -- ${CODEBUILD_SRC_DIR_dmproadmap_commit}"
-      - echo $(ls -la $CODEBUILD_SRC_DIR_dmproadmap_commit)
+      # This is CDLUC3/dmp-roadmap-cfn codebase directory
+      - echo "CDLUC3/dmp-roadmap-cfn dir -- ${CODEBUILD_SRC_DIR}"
+      - echo "CDLUC3/dmp-roadmap-cfn commit -- ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
-      # - echo $(cd $CODE_DIR && ls -la)
-      - echo "GIT COMMIT - $(cd $CODEBUILD_SRC_DIR_dmproadmap_commit && git log -n 1 --pretty=format:%H)"
-      - echo $(pwd)
+      # This is the DMPRoadmap/roadmap codebase directory
+      - echo "DMPRoadmap/roadmap dir -- ${CODEBUILD_SRC_DIR_dmproadmap_commit}"
 
-      # Build a symlink to the code directory
-      - echo Adding symbolic link to the DMPRoadmap codebase to the CFN Docker dir
-      # - echo "PWD -- $(pwd)"
-      # - cd ./application
-      # - if [ -L ./roadmap ]; then rm roadmap; fi
-      # - ln -s $CODE_DIR ./roadmap
+      # Build a symlink in the CDLUC3/dmp-roadmap-cfn directory to DMPRoadmap/roadmap for Docker
+      - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
+      - if [ -L ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap; fi
+      - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit ${CODEBUILD_SRC_DIR}/application/roadmap
+      - echo $(ls -la $CODEBUILD_SRC_DIR_dmproadmap_commit/application/roadmap/)
 
       # Fetch the ECR repository name
-      # - echo Fetching ECR URI
-      # - echo "PWD -- $(pwd)"
-      #- echo $ECR_REPOSITORY_URI >> .ecr
-      # - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
-      #- rm .ecr
-      #- echo ECR repo - $SHORT_ECR_URI
-
-      - SHORT_ECR_URI=671846987296.dkr.ecr.us-west-2.amazonaws.com
+      - echo $ECR_REPOSITORY_URI >> .ecr
+      - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .ecr)
+      - rm .ecr
 
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
       - echo Logging in to Amazon ECR...
-      - echo "PWD -- $(pwd)"
-      # - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
-      # - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      # - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - cd $CODEBUILD_SRC_DIR
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
+      - "IMAGE_TAG=dmproadmap:=latest"
 
       - echo $(printenv)
   build:
