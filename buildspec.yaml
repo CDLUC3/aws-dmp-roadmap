@@ -61,7 +61,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - cd $CODEBUILD_SRC_DIR
+      - cd $CODEBUILD_SRC_DIR/application
       # - docker build -t $ECR_REPOSITORY_NAME .
       # - "docker tag $ECR_REPOSITORY_NAME $FULL_ECR_URI:latest"
       - docker build -t $SHORT_ECR_URI:latest .
@@ -70,7 +70,7 @@ phases:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker images...
-      - cd $CODEBUILD_SRC_DIR
+      - cd $CODEBUILD_SRC_DIR/application
       - docker push $SHORT_ECR_URI:latest
       - docker push $SHORT_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
