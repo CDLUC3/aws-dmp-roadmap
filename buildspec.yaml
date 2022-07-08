@@ -37,10 +37,10 @@ phases:
       # - ln -s $CODE_DIR ./roadmap
 
       # Fetch the ECR repository name
-      - echo Fetching ECR URI
-      - echo "PWD -- $(pwd)"
+      # - echo Fetching ECR URI
+      # - echo "PWD -- $(pwd)"
       #- echo $ECR_REPOSITORY_URI >> .ecr
-      - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
+      # - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
       #- rm .ecr
       #- echo ECR repo - $SHORT_ECR_URI
 
