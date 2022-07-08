@@ -19,6 +19,7 @@ phases:
       - export RAILS_ENV=ci
       - export RAILS_LOG_TO_STDOUT=true
       - export DRAGONFLY_AWS=false
+      - export AWS_VERSION=$(aws )
 
       # This is CDLUC3/dmp-roadmap-cfn codebase directory
       - echo "CDLUC3/dmp-roadmap-cfn dir -- ${CODEBUILD_SRC_DIR}"
@@ -42,7 +43,9 @@ phases:
       - echo Logging in to Amazon ECR...
       - cd $CODEBUILD_SRC_DIR
       - echo $SHORT_ECR_URI
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
+      # CodeBuild is using cli v1 so need to use `get-login` instead of `get-login-password`
+      # - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
+      - aws ecr get-login --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
       - "IMAGE_TAG=dmproadmap:=latest"
 
       - echo $(printenv)
