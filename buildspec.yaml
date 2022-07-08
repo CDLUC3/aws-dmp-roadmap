@@ -31,16 +31,17 @@ phases:
       - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
       - if [ -L ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap; fi
       - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit ${CODEBUILD_SRC_DIR}/application/roadmap
-      - echo $(ls -la $CODEBUILD_SRC_DIR_dmproadmap_commit/application/roadmap/)
+      - echo $(ls -la $CODEBUILD_SRC_DIR/application/roadmap/)
 
       # Fetch the ECR repository name
       - echo $ECR_REPOSITORY_URI >> .ecr
-      - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .ecr)
+      - export SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .ecr)
       - rm .ecr
 
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
       - echo Logging in to Amazon ECR...
       - cd $CODEBUILD_SRC_DIR
+      - echo $SHORT_ECR_URI
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
       - "IMAGE_TAG=dmproadmap:=latest"
 
