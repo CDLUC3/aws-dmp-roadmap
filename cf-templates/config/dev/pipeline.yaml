@@ -11,12 +11,12 @@ parameters:
   # buried in the docs:
   #   "When you set up your AWS CodeBuild projects to access your VPC, choose private subnets only."
   Subnets:
-    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
-    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
-    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
-    - 'subnet-0b6ce38d6c451c40c'
-    - 'subnet-007d03c7b2d5867c9'
-    - 'subnet-01df5798fad9d5a9d'
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
+    # - 'subnet-0b6ce38d6c451c40c'
+    # - 'subnet-007d03c7b2d5867c9'
+    # - 'subnet-01df5798fad9d5a9d'
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
