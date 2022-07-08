@@ -14,9 +14,6 @@ proxy:
 phases:
   pre_build:
     commands:
-      # - CFN_DIR=${CODEBUILD_SRC_DIR}
-      - CODE_DIR=${CODEBUILD_SRC_DIR_DMPRoadmapPush}
-
       # Set some ENV variables here because CF only allows a limit of 1000 characters in the
       # EnvironmentVariable config for the Pipeline action :(
       - export RAILS_ENV=ci
@@ -25,11 +22,12 @@ phases:
 
       - echo "CODEBUILD_SRC_DIR -- ${CODEBUILD_SRC_DIR}"
       - echo $(ls -la)
-      - echo "CODEBUILD_GOPATH -- ${CODEBUILD_GOPATH}"
-      - echo $(ls -la $CODEBUILD_GOPATH)
+      - echo "CODEBUILD_SRC_DIR_dmproadmap_commit -- ${CODEBUILD_SRC_DIR_dmproadmap_commit}"
+      - echo $(ls -la $CODEBUILD_SRC_DIR_dmproadmap_commit)
 
       # - echo $(cd $CODE_DIR && ls -la)
-      - echo "GIT COMMIT - $(git log -n 1 --pretty=format:%H)"
+      - echo "GIT COMMIT - $(cd $CODEBUILD_SRC_DIR_dmproadmap_commit && git log -n 1 --pretty=format:%H)"
+      - echo $(pwd)
 
       # Build a symlink to the code directory
       - echo Adding symbolic link to the DMPRoadmap codebase to the CFN Docker dir
