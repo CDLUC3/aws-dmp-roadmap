@@ -285,7 +285,7 @@ Resources:
                 ConnectionArn: !Ref CodeStarConnectionArn
                 FullRepositoryId: 'DMPRoadmap/roadmap'
                 BranchName: 'development'
-                OutputArtifactFormat: 'CODE_ZIP'
+                OutputArtifactFormat: 'CODEBUILD_CLONE_REF'
               OutputArtifacts:
                 - Name: !Sub 'dmproadmap_commit'
 

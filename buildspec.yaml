@@ -28,6 +28,8 @@ phases:
       # This is the DMPRoadmap/roadmap codebase directory
       - echo "DMPRoadmap/roadmap dir -- ${CODEBUILD_SRC_DIR_dmproadmap_commit}"
 
+      - echo $(ls -lah $CODEBUILD_SRC_DIR_dmproadmap_commit/)
+
       # Build a symlink in the CDLUC3/dmp-roadmap-cfn directory to DMPRoadmap/roadmap for Docker
       - echo Adding sym link to the DMPRoadmap/roadmap codebase in the CDLUC3/dmp-roadmap-cfn dir
       - if [ ${CODEBUILD_SRC_DIR}/application/roadmap ]; then rm -rf ${CODEBUILD_SRC_DIR}/application/roadmap/; fi
@@ -47,7 +49,8 @@ phases:
       - cd $CODEBUILD_SRC_DIR
       # CodeBuild is using cli v1 so need to use `get-login` instead of `get-login-password`
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
-      - "IMAGE_TAG=${SHORT_ECR_URI}:=latest"
+      # - "IMAGE_TAG=${SHORT_ECR_URI}:=latest"
+      - "IMAGE_TAG=${FULL_ECR_URI}:=latest"
 
       - echo $(printenv)
   build:
@@ -55,8 +58,9 @@ phases:
       - echo Build started on `date`
       - echo Building the Docker image...
       - cd $DOCKER_DIR
-      - docker build -t $FULL_ECR_URI:latest .
-      - docker tag $FULL_ECR_URI:latest $FULL_ECR_URI:$IMAGE_TAG
+      - docker build -t $ECR_REPOSITORY_NAME .
+      - 671846987296.dkr.ecr.us-west-2.amazonaws.com/uc3-dmp-roadmap-dev-ecr:latest
+      - "docker tag $ECR_REPOSITORY_NAME $FULL_ECR_URI:latest"
   post_build:
     commands:
       - echo Build completed on `date`
