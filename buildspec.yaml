@@ -71,5 +71,5 @@ phases:
       - echo Writing image definitions file...
       - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > dmproadmap_image.json
       - cat dmproadmap_image.json
-artifacts:
-    files: dmproadmap_image.json
+# artifacts:
+  # files: dmproadmap_image.json

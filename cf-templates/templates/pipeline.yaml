@@ -294,7 +294,7 @@ Resources:
                 BranchName: 'development'
                 OutputArtifactFormat: 'CODEBUILD_CLONE_REF'
               OutputArtifacts:
-                - Name: !Sub 'dmproadmap_commit'
+                - Name: 'dmproadmap_commit'
 
             # This action is triggered when the DMPRoadmap docker/CF codebase main branch receives
             # a new commit. Its output is a zip archive of the commit
@@ -313,7 +313,7 @@ Resources:
                 BranchName: 'main'
                 OutputArtifactFormat: 'CODE_ZIP'
               OutputArtifacts:
-                - Name: !Sub 'dmproadmap_docker'
+                - Name: 'dmproadmap_docker'
 
         - Name: 'DockerBuildPublish'
           Actions:
@@ -332,10 +332,10 @@ Resources:
                 ProjectName: !Ref CodeBuildProject
                 PrimarySource: !Sub 'dmproadmap_docker'
               InputArtifacts:
-                - Name: !Sub 'dmproadmap_commit'
-                - Name: !Sub 'dmproadmap_docker'
+                - Name: 'dmproadmap_commit'
+                - Name: 'dmproadmap_docker'
               OutputArtifacts:
-                - Name: !Sub 'dmproadmap_image'
+                - Name: 'dmproadmap_image'
 
         - Name: 'FargateDeploy'
           Actions:
@@ -350,7 +350,7 @@ Resources:
                 ClusterName: !Ref ECSClusterName
                 ServiceName: !Ref ECSServiceName
               InputArtifacts:
-                - Name: !Sub 'dmproadmap_image'
+                - Name: 'dmproadmap_image'
 
 Outputs:
   LogGroupId:
