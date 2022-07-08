@@ -134,6 +134,7 @@ Resources:
               - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilderECRContainerBuilds'
       Policies:
         - PolicyName: !Sub '${AppName}-build-policy'
           PolicyDocument: !Sub >
