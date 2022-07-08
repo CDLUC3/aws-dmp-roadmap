@@ -36,8 +36,12 @@ phases:
       - ln -s $CODEBUILD_SRC_DIR_dmproadmap_commit/ ${CODEBUILD_SRC_DIR}/application/roadmap
       - export DOCKER_DIR=$CODEBUILD_SRC_DIR/application/roadmap/
 
-      - echo "Examining contents of ${DOCKER_DIR}"
-      - echo $(ls -la $DOCKER_DIR)
+      # Fetch the Git commit from the DMPRoadmap repo
+      - cd $DOCKER_DIR && export DMPROADMAP_COMMIT=$(git log --format="%H" -n 1 | cut -c 1-7)
+
+      # Add the Git commit to the footer of the DMPRoadmap application
+      - echo "Appending Git revision number ${DMPROADMAP_COMMIT} to DMPRoadmap footer ..."
+      - "'<p>Revision: ${DMPROADMAP_COMMIT}</p>' >> $DOCKER_DIR/app/views/layouts/_footer.html.erb"
 
       # Fetch the ECR repository name
       - echo $ECR_REPOSITORY_URI >> .ecr
@@ -49,8 +53,8 @@ phases:
       - cd $CODEBUILD_SRC_DIR
       # CodeBuild is using cli v1 so need to use `get-login` instead of `get-login-password`
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
-      # - "IMAGE_TAG=${SHORT_ECR_URI}:=latest"
-      - "IMAGE_TAG=${FULL_ECR_URI}:=latest"
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      # - "IMAGE_TAG=${FULL_ECR_URI}:=latest"
 
       - echo $(printenv)
   build:
@@ -58,16 +62,17 @@ phases:
       - echo Build started on `date`
       - echo Building the Docker image...
       - cd $DOCKER_DIR
-      - docker build -t $ECR_REPOSITORY_NAME .
-      - 671846987296.dkr.ecr.us-west-2.amazonaws.com/uc3-dmp-roadmap-dev-ecr:latest
-      - "docker tag $ECR_REPOSITORY_NAME $FULL_ECR_URI:latest"
+      # - docker build -t $ECR_REPOSITORY_NAME .
+      # - "docker tag $ECR_REPOSITORY_NAME $FULL_ECR_URI:latest"
+      - docker build -t $SHORT_ECR_URI:latest .
+      - docker tag $ECR_REPOSITORY_URI:latest $SHORT_ECR_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker images...
       - cd $DOCKER_DIR
-      - docker push $FULL_ECR_URI:latest
-      - docker push $FULL_ECR_URI:$IMAGE_TAG
+      - docker push $SHORT_ECR_URI:latest
+      - docker push $SHORT_ECR_URI:$IMAGE_TAG
       - echo Writing image definitions file...
       - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - cat imagedefinitions.json

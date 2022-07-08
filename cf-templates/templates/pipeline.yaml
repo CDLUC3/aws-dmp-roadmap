@@ -178,6 +178,11 @@ Resources:
                   "Resource": [
                     "*"
                   ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["codestar-connections:UseConnection"],
+                  "Resource": "${CodeStarConnectionArn}"
                 }
               ]
             }
