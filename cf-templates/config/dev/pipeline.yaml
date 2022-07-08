@@ -6,6 +6,10 @@ parameters:
   VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
   # TODO: figure out why Subnet outputs are incorrect in CF. Pref would be to call
   #       !stack_output_external like in application.yaml
+  #
+  # Need to use private subnets here (may need to create a NAT gateway). Found this
+  # buried in the docs:
+  #   "When you set up your AWS CodeBuild projects to access your VPC, choose private subnets only."
   Subnets:
     # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
     # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b

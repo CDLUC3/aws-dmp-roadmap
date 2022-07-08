@@ -116,6 +116,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/AWSCodePipelineFullAccess'
         - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
         - 'arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess'
+        - 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
 
   IAMCodeBuildRole:
     Type: 'AWS::IAM::Role'
