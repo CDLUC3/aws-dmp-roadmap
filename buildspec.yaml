@@ -14,7 +14,7 @@ proxy:
 phases:
   pre_build:
     commands:
-      - CFN_DIR=${CODEBUILD_SRC_DIR}
+      # - CFN_DIR=${CODEBUILD_SRC_DIR}
       - CODE_DIR=${CODEBUILD_SRC_DIR_DMPRoadmapPush}
 
       # Set some ENV variables here because CF only allows a limit of 1000 characters in the
@@ -25,24 +25,22 @@ phases:
 
       - echo "PWD -- $(pwd)"
       - echo $(ls -la)
-      - echo "dmp-roadmap-cfn directory -- $CFN_DIR"
-      - echo $(cd $CFN_DIR && ls -la)
       - echo "dmproadmap code dir -- ${CODE_DIR}"
-      - echo $(cd $CODE_DIR && ls -la)
+      # - echo $(cd $CODE_DIR && ls -la)
       - echo "GIT COMMIT - $(git log -n 1 --pretty=format:%H)"
 
       # Build a symlink to the code directory
       - echo Adding symbolic link to the DMPRoadmap codebase to the CFN Docker dir
-      - echo "PWD -- $(pwd)"
-      - cd $CFN_DIR
-      - if [ -L ./roadmap ]; then rm roadmap; fi
-      - ln -s $CODE_DIR ./roadmap
+      # - echo "PWD -- $(pwd)"
+      # - cd ./application
+      # - if [ -L ./roadmap ]; then rm roadmap; fi
+      # - ln -s $CODE_DIR ./roadmap
 
       # Fetch the ECR repository name
       - echo Fetching ECR URI
       - echo "PWD -- $(pwd)"
       #- echo $ECR_REPOSITORY_URI >> .ecr
-      #- SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
+      - SHORT_ECR_URI=$(awk '{gsub("$ECR_REPOSITORY_NAME", "");print}' .repo)
       #- rm .ecr
       #- echo ECR repo - $SHORT_ECR_URI
 
