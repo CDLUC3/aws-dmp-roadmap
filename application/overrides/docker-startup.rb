@@ -17,10 +17,13 @@ chdir "#{APP_ROOT}/roadmap" do
   # This script is a starting point to setup your application.
   # Add necessary setup steps to this file.
   if ENV['DB_SNAPSHOT'] == 'none'
+    system! "#{prefix} bin/rails db:drop"
     system! "#{prefix} bin/rails db:create"
     system! "#{prefix} bin/rails db:schema:load"
     system! "#{prefix} bin/rails db:seed"
   end
+
+  system! "export WICKED_PDF_PATH=`which wkhtmltopdf`"
 
   system! "#{prefix} bin/rails db:migrate"
 
