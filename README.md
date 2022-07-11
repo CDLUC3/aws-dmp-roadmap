@@ -98,6 +98,8 @@ It takes roughly 10-15 minutes between the time a commit appears in the monitore
 
 The CodeBuild project attaches the git Revision number to the footer of the DMPRoadmap page so you can verify that this is working appropriately.
 
+NOTE: **if you do not include the DBSnapshotId in the `cf-templates/config/dev/application.yaml` and `cf-templates/config/dev/pipeline.yaml` files then the database may be overwritten and replaced with the default seed data!**
+
 ## Troubleshooting
 
 - The Docker image sends its logs to the `uc3-dmp-roadmap-dev-ecs` CloudWatch LogGroup. You can go to this log group in the AWS console to investigate application errors.
