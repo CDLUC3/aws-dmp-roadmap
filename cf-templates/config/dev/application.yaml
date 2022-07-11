@@ -5,9 +5,15 @@ template:
 parameters:
   VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
   Subnets:
-    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
-    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
-    - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2a
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2b
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2c
+    - 'subnet-0b6ce38d6c451c40c'
+    - 'subnet-007d03c7b2d5867c9'
+    - 'subnet-01df5798fad9d5a9d'
+    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application
@@ -42,4 +48,4 @@ parameters:
   # If you have an existing RDS snapshot of your DB, you can include it here and CF will
   # restore that snapshot. If not, just leave this commented out and Docker will initialize the DB
   # DBSnapshot: 'ARN of my DBSnapshotIdentifier'
-  DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'
+  # DBSnapshot: 'arn:aws:rds:us-west-2:671846987296:snapshot:uc3-dmp-roadmap-initial'

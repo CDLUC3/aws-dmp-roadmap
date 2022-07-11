@@ -8,6 +8,8 @@ Parameters:
     Type: 'AWS::EC2::VPC::Id'
   Subnets:
     Type: 'List<AWS::EC2::Subnet::Id>'
+  OldSubnets:
+    Type: 'List<AWS::EC2::Subnet::Id>'
 
   AppName:
     Type: String
@@ -155,17 +157,24 @@ Resources:
     Properties:
       DBSubnetGroupDescription: !Sub 'Subnet group for ${AppName}-${Environment}'
       SubnetIds:
+        !Ref OldSubnets
+
+  DBSubnetGroupPrivate:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub 'Subnet group for ${AppName}-${Environment}'
+      SubnetIds:
         !Ref Subnets
 
   Database:
     Type: 'AWS::RDS::DBInstance'
     DependsOn:
-      - DBSubnetGroup
+      - DBSubnetGroupPrivate
       - DBSecurityGroup
     Properties:
       VPCSecurityGroups:
         - !Ref DBSecurityGroup
-      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBSubnetGroupName: !Ref DBSubnetGroupPrivate
 
       # If an RDS Snapshot was defined, then instruct CF to restore it
       DBSnapshotIdentifier: !If

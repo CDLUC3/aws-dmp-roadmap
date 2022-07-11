@@ -7,14 +7,21 @@ parameters:
   # TODO: figure out why Subnet outputs are incorrect in CF. Pref would be to call
   #       !stack_output_external like in application.yaml
   Subnets:
+    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
+    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
+    # - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
+
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2a
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2b
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2c
+    - 'subnet-0b6ce38d6c451c40c'
+    - 'subnet-007d03c7b2d5867c9'
+    - 'subnet-01df5798fad9d5a9d'
+
+  OldSubnets:
     - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2a
     - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2b
     - !stack_output_external cdl-uc3-dev-defaultsubnet-stack::defaultsubnet2c
-    # TODO: Switched to public subnets to see if ECS could talk to RDS ... did not work
-    #       switching back requires stak deletion
-    # - 'subnet-0b6ce38d6c451c40c'
-    # - 'subnet-007d03c7b2d5867c9'
-    # - 'subnet-01df5798fad9d5a9d'
 
   Environment: !stack_attr sceptre_user_data.env
   AppName: !stack_attr sceptre_user_data.application

@@ -32,6 +32,13 @@ Parameters:
   ECRRepositoryName:
     Type: String
 
+  DMPRoadmapBranchToMonitor:
+    Type: String
+    Default: 'development'
+  DMPRoadmapCFNBranchToMonitor:
+    Type: String
+    Default: 'main'
+
   RailsEnv:
     Type: String
   RailsLogLevel:
@@ -291,7 +298,7 @@ Resources:
               Configuration:
                 ConnectionArn: !Ref CodeStarConnectionArn
                 FullRepositoryId: 'DMPRoadmap/roadmap'
-                BranchName: 'development'
+                BranchName: !Ref DMPRoadmapBranchToMonitor
                 OutputArtifactFormat: 'CODEBUILD_CLONE_REF'
               OutputArtifacts:
                 - Name: 'dmproadmap_commit'
@@ -310,7 +317,7 @@ Resources:
               Configuration:
                 ConnectionArn: !Ref CodeStarConnectionCfnArn
                 FullRepositoryId: 'CDLUC3/dmp-roadmap-cfn'
-                BranchName: 'main'
+                BranchName: !Ref DMPRoadmapCFNBranchToMonitor
                 OutputArtifactFormat: 'CODE_ZIP'
               OutputArtifacts:
                 - Name: 'dmproadmap_docker'
@@ -337,20 +344,21 @@ Resources:
               OutputArtifacts:
                 - Name: 'dmproadmap_image'
 
-        - Name: 'FargateDeploy'
-          Actions:
-            - Name: 'Deploy'
-              RunOrder: 3
-              ActionTypeId:
-                Category: 'Deploy'
-                Owner: 'AWS'
-                Provider: 'ECS'
-                Version: '1'
-              Configuration:
-                ClusterName: !Ref ECSClusterName
-                ServiceName: !Ref ECSServiceName
-              InputArtifacts:
-                - Name: 'dmproadmap_image'
+        # We don't need this for Fargate, Fargate deploys from ECR automatically
+        # - Name: 'FargateDeploy'
+        #   Actions:
+        #     - Name: 'Deploy'
+        #       RunOrder: 3
+        #       ActionTypeId:
+        #         Category: 'Deploy'
+        #         Owner: 'AWS'
+        #         Provider: 'ECS'
+        #         Version: '1'
+        #       Configuration:
+        #         ClusterName: !Ref ECSClusterName
+        #         ServiceName: !Ref ECSServiceName
+        #       InputArtifacts:
+        #         - Name: 'dmproadmap_image'
 
 Outputs:
   LogGroupId:

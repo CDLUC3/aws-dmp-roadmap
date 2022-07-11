@@ -4,13 +4,10 @@ template:
 
 parameters:
   VpcID: !stack_output_external cdl-uc3-dev-vpc-stack::vpc
-  # TODO: figure out why Subnet outputs are incorrect in CF. Pref would be to call
-  #       !stack_output_external like in application.yaml
-  #
-  # Need to use private subnets here (may need to create a NAT gateway). Found this
-  # buried in the docs:
-  #   "When you set up your AWS CodeBuild projects to access your VPC, choose private subnets only."
   Subnets:
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2a
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2b
+    # - !stack_output_external cdl-uc3-dev-privatesubnet-stack::privatesubnet2c
     - 'subnet-0b6ce38d6c451c40c'
     - 'subnet-007d03c7b2d5867c9'
     - 'subnet-01df5798fad9d5a9d'
@@ -28,6 +25,11 @@ parameters:
   ECRRepositoryURI: !stack_output dev/data.yaml::ECRRepositoryURI
   ECRRepositoryName: !stack_output dev/data.yaml::ECRRepositoryName
 
+  # The branches to monitor for changes.
+  DMPRoadmapBranchToMonitor: 'development'
+  DMPRoadmapCFNBranchToMonitor: 'main'
+
+  # Environment variables required to build the Docker image
   RailsEnv: !stack_attr sceptre_user_data.rails_env
   RailsLogLevel: !stack_attr sceptre_user_data.rails_log_level
   ALBDNSName: !stack_output dev/frontend.yaml::ALBDNSName

@@ -78,8 +78,11 @@ COPY overrides/config/webpack/ci.js config/webpack/ci.js
 # Initialize the credentials file
 RUN EDITOR='echo "$(cat config/credentials.yml.example)" >' bin/rails credentials:edit
 
-# SETUP ENV variables
+# INSTALL WKHTMLTOPDF LIBRARY and add it to the ENV variables
+RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.focal_amd64.deb \
+    && apt install ./wkhtmltox_0.12.6-1.focal_amd64.deb
 RUN export WICKED_PDF_PATH=`which wkhtmltopdf`
+RUN echo $WICKED_PDF_PATH
 
 # Copy the startup script into the container
 COPY --chown=755 overrides/docker-startup.rb ./docker-startup.rb

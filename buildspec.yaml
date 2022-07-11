@@ -20,7 +20,6 @@ phases:
 
       # This is CDLUC3/dmp-roadmap-cfn codebase directory
       - echo "CDLUC3/dmp-roadmap-cfn dir -- ${CODEBUILD_SRC_DIR}"
-      - echo "CDLUC3/dmp-roadmap-cfn commit -- ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
       # This is the DMPRoadmap/roadmap codebase directory
       - echo "DMPRoadmap/roadmap dir -- ${CODEBUILD_SRC_DIR_dmproadmap_commit}"
@@ -46,23 +45,19 @@ phases:
       # Set the repository URI to your ECR image and add an image tag with the first seven characters of the Git commit ID of the source.
       - echo Logging in to Amazon ECR ...
       - cd $CODEBUILD_SRC_DIR
-      # CodeBuild is using cli v1 so need to use `get-login` instead of `get-login-password`
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SHORT_ECR_URI
       - IMAGE_TAG=${COMMIT_HASH:=latest}
-      # - "IMAGE_TAG=${FULL_ECR_URI}:=latest"
-
-      - echo $(printenv)
   build:
     commands:
+      # Build the Docker image and tag it
       - echo Build started on `date`
       - echo Building the Docker image...
       - cd $CODEBUILD_SRC_DIR/application
-      # - docker build -t $ECR_REPOSITORY_NAME .
-      # - "docker tag $ECR_REPOSITORY_NAME $FULL_ECR_URI:latest"
       - docker build -t $SHORT_ECR_URI:latest .
       - docker tag $ECR_REPOSITORY_URI:latest $SHORT_ECR_URI:$IMAGE_TAG
   post_build:
     commands:
+      # Push the Docker image to the ECR repository. Fargate will pick it up an deploy automatically
       - echo Build completed on `date`
       - echo Pushing the Docker images...
       - cd $CODEBUILD_SRC_DIR/application
@@ -71,5 +66,3 @@ phases:
       - echo Writing image definitions file...
       - printf '[{"name":"uc3-dmp-roadmap","imageUri":"%s"}]' $ECR_REPOSITORY_URI:$IMAGE_TAG > dmproadmap_image.json
       - cat dmproadmap_image.json
-# artifacts:
-  # files: dmproadmap_image.json
