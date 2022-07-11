@@ -13,11 +13,9 @@ end
 
 chdir "#{APP_ROOT}/roadmap" do
   prefix = "RAILS_ENV=#{ENV['RAILS_ENV']}"
-
   system! "bin/rails db:environment:set RAILS_ENV=#{ENV['RAILS_ENV']}"
 
-  # This script is a starting point to setup your application.
-  # Add necessary setup steps to this file.
+  # If the default DBSnapshot is present, then rebuild the database from scratch
   if ENV['DB_SNAPSHOT'] == 'none'
     system! "#{prefix} bin/rails db:drop"
     system! "#{prefix} bin/rails db:create"

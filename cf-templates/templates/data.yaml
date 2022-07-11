@@ -42,11 +42,6 @@ Conditions:
     !Not [!Equals [!Ref DBSnapshot, 'none']]
 
 Resources:
-  # TODO: Consider creating the SSM parameters instead of feeding them in
-  #       https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssm-parameter.html
-  #
-  # CloudFormation doesn't support SecureString for some reason so we should use secrets
-
   # -----------------------------------------------------------
   # Elastic Container Repository (ECR) - Hosts the application's Docker images
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_ECR.html
@@ -113,34 +108,9 @@ Resources:
         - 'arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole'
 
   # -----------------------------------------------------------
-  # S3 Bucket for the application to store logos
-  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_S3.html
-  # -----------------------------------------------------------
-  #
-  # TODO: The Dragonfly gem allows for storing logos in an S3 bucket but it uses Fog::Aws
-  #       which requires an AWS access key and secret. We may need to fork the dragonfly
-  #       s3 storage gem and modify it to use direct AWS sdk libraries since the bucket
-  #       and ECS instances are running in the same VPC
-  #         See: https://github.com/fog/fog-aws
-  #              https://github.com/markevans/dragonfly-s3_data_store
-  #
-  # S3Bucket:
-  #   Type: AWS::S3::Bucket
-  #   Properties:
-  #     PublicAccessBlockConfiguration:
-  #       RestrictPublicBuckets: true
-
-  # -----------------------------------------------------------
   # EC2 Security Groups for use with RDS database and S3 Bucket
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
   # -----------------------------------------------------------
-  # S3SecurityGroup:
-  #   Type: AWS::EC2::SecurityGroup
-  #   Properties:
-  #     GroupDescription: !Sub 'S3 security group for ${AppName}-${Environment}'
-  #     GroupName: !Sub '${AppName}-s3-sec'
-  #     VpcId: !Ref VpcID
-
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -206,13 +176,6 @@ Outputs:
   ECRRepositoryURI:
     Value: !GetAtt ECRRepository.RepositoryUri
 
-  # S3BucketName:
-  #   Value: !Ref S3Bucket
-  # S3BucketARN:
-  #   Value: !GetAtt S3Bucket.Arn
-  # S3BucketURL:
-  #   Value: !GetAtt S3Bucket.WebsiteURL
-
   DBInstanceName:
     Value: !Ref Database
   DBAddress:
@@ -222,7 +185,5 @@ Outputs:
   DBName:
     Value: !Ref DBName
 
-  # S3SecurityGroupID:
-  #   Value: !GetAtt S3SecurityGroup.GroupId
   DBSecurityGroupID:
     Value: !GetAtt DBSecurityGroup.GroupId

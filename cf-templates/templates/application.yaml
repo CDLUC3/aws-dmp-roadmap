@@ -26,11 +26,6 @@ Parameters:
   ECRRepositoryName:
     Type: String
 
-  # S3BucketName:
-  #   Type: String
-  # S3SecurityGroupID:
-  #   Type: String
-
   ALBTargetGroupARN:
     Type: String
   ALBDNSName:
@@ -153,11 +148,6 @@ Resources:
       DefaultCapacityProviderStrategy:
         - CapacityProvider: 'FARGATE_SPOT'
 
-      # TODO: For some reason this fails - would be nice as it enables CloudWatch metrics
-      # ClusterSettings:
-      #   Name: 'containerInsights'
-      #   Value: 'enabled'
-
   # The Application/Task definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -203,14 +193,6 @@ Resources:
             # RDS port
             - ContainerPort: 3306
               Protocol: 'tcp'
-          # TODO: See if there is a way for Rails to use these. Passing in Env is not recommended
-          #       for passwords/secrets
-          #
-          # Secrets:
-          #   - Name: 'DATABASE_USERNAME'
-          #     ValueFrom: '/uc3/dmp/roadmap/dev/db_app_username'
-          #   - Name: 'DATABASE_PASSWORD'
-          #     ValueFrom: '/uc3/dmp/roadmap/dev/db_app_password'
           Environment:
             - Name: 'RAILS_ENV'
               Value: !Ref RailsEnv
@@ -249,7 +231,6 @@ Resources:
       Cluster: !Ref ECSCluster
       DesiredCount: !Ref ECSDesiredServiceCount
       EnableECSManagedTags: true
-      # EnableExecuteCommand: true #TODO: investigate what this means
       HealthCheckGracePeriodSeconds: 300 # 5 minutes for app startup
       LaunchType: 'FARGATE'
       LoadBalancers:

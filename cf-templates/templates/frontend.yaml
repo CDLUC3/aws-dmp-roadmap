@@ -64,12 +64,10 @@ Resources:
   ALBTargetGroup:
     Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
     Properties:
-      # Name: !Sub '${AppName}-${Environment}-fargate-targ'
       HealthCheckEnabled: true
       HealthCheckIntervalSeconds: 300 # 5 minutes
       HealthCheckPath: '/'
       HealthCheckPort: 'traffic-port'
-      # HealthCheckProtocol: 'HTTPS'
       HealthCheckProtocol: 'HTTP'
       HealthCheckTimeoutSeconds: 30
       UnhealthyThresholdCount: 3
@@ -85,9 +83,6 @@ Resources:
           Value: 'lb_cookie'
         - Key: 'stickiness.lb_cookie.duration_seconds'
           Value: 900 # 15 minutes
-        # TODO: Reenable this once HTTPS
-        # - Key: 'preserve_client_ip.enabled'
-        #   Value: true
       TargetType: 'ip'
 
   ALB:
