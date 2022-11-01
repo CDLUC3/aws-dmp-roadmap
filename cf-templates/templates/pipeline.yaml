@@ -76,16 +76,6 @@ Resources:
       RetentionInDays: 30
 
   # -----------------------------------------------------------
-  # S3 Bucket for the pipeline artifacts
-  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
-  # -----------------------------------------------------------
-  S3Bucket:
-    Type: 'AWS::S3::Bucket'
-    Properties:
-      PublicAccessBlockConfiguration:
-        RestrictPublicBuckets: true
-
-  # -----------------------------------------------------------
   # Identitity and Access Management (IAM)
   #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_IAM.html
   # -----------------------------------------------------------
@@ -375,13 +365,6 @@ Outputs:
     Value: !Ref IAMCodeBuildRole
   CodeBuildRoleArn:
     Value: !GetAtt IAMCodeBuildRole.Arn
-
-  S3BucketId:
-    Value: !Ref S3Bucket
-  S3BucketUri:
-    Value: !Sub "s3://${S3Bucket}"
-  S3BucketArn:
-    Value: !GetAtt S3Bucket.Arn
 
   CodeBuildProjectName:
     Value: !Ref CodeBuildProject

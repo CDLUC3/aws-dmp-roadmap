@@ -48,6 +48,7 @@ Resources:
   # -----------------------------------------------------------
   ECRRepository:
     Type: 'AWS::ECR::Repository'
+    DeletionPolicy: Retain
     Properties:
       RepositoryName: !Sub '${AppName}-${Environment}-ecr'
       ImageScanningConfiguration:
@@ -138,6 +139,7 @@ Resources:
 
   Database:
     Type: 'AWS::RDS::DBInstance'
+    DeletionPolicy: Snapshot # Will create a snapshot before deleting
     DependsOn:
       - DBSubnetGroupPrivate
       - DBSecurityGroup
@@ -168,6 +170,24 @@ Resources:
       MasterUsername: '{{resolve:ssm:/uc3/dmp/roadmap/dev/db_dba_username}}'
       MasterUserPassword: '{{resolve:ssm-secure:/uc3/dmp/roadmap/dev/db_dba_password}}'
 
+  # -----------------------------------------------------------
+  # S3 Buckets for the pipeline artifacts and storing application logos
+  #   See: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+  # -----------------------------------------------------------
+  PipelineS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Delete # We don't care about old build artifacts so let them get deleted
+    Properties:
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+  
+  AppS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain # Retain this bucket so we don't lose the application logos
+    Properties:
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+
 Outputs:
   ECRRepositoryName:
     Value: !Ref ECRRepository
@@ -187,3 +207,17 @@ Outputs:
 
   DBSecurityGroupID:
     Value: !GetAtt DBSecurityGroup.GroupId
+
+  PipelineS3BucketId:
+    Value: !Ref PipelineS3Bucket
+  PipelineS3BucketUri:
+    Value: !Sub "s3://${PipelineS3Bucket}"
+  PipelineS3BucketArn:
+    Value: !GetAtt PipelineS3Bucket.Arn
+
+  AppS3BucketId:
+    Value: !Ref AppS3Bucket
+  AppS3BucketUri:
+    Value: !Sub "s3://${AppS3Bucket}"
+  AppS3BucketArn:
+    Value: !GetAtt AppS3Bucket.Arn
